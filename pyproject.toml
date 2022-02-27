@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "flax-tools"
+version = "0.0.1"
+description = ""
+authors = ["Cristian Garcia <cgarcia.e88@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+flax = "^0.4.0"
+
+[tool.poetry.dev-dependencies]
+black = {version = "^22.1.0", allow-prereleases = true}
+pytest = "^7.0.1"
+pytest-cov = "^3.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
