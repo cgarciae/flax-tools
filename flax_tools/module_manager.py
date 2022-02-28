@@ -24,10 +24,15 @@ class ModuleManager(tp.Generic[M]):
     mutable_eval: tp.Sequence[str] = flax.struct.field(pytree_node=False)
     rngs_init: tp.Sequence[str] = flax.struct.field(pytree_node=False)
     rngs_apply: tp.Sequence[str] = flax.struct.field(pytree_node=False)
+    method_init: str = flax.struct.field(pytree_node=False)
 
     @property
     def module(self: "ModuleManager[M]") -> M:
         return self.hashable.value
+
+    @property
+    def initialized(self: "ModuleManager[M]") -> bool:
+        return self.variables is not None
 
     @classmethod
     def new(
@@ -40,6 +45,7 @@ class ModuleManager(tp.Generic[M]):
         mutable_eval: tp.Optional[tp.Sequence[str]] = None,
         rngs_init: tp.Sequence[str] = ("params",),
         rngs_apply: tp.Sequence[str] = ("dropout",),
+        method_init: str = "__call__",
     ) -> "ModuleManager[M]":
         return cls(
             hashable=utils.Hashable(module),
@@ -50,6 +56,7 @@ class ModuleManager(tp.Generic[M]):
             mutable_eval=mutable_eval or tuple(mutable_train),
             rngs_init=rngs_init,
             rngs_apply=rngs_apply,
+            method_init=method_init,
         )
 
     def copy(self: "ModuleManager[M]") -> "ModuleManager[M]":
@@ -66,6 +73,7 @@ class ModuleManager(tp.Generic[M]):
             mutable_eval=tuple(self.mutable_eval),
             rngs_init=tuple(self.rngs_init),
             rngs_apply=tuple(self.rngs_apply),
+            method_init=self.method_init,
         )
 
     def init(
@@ -77,9 +85,20 @@ class ModuleManager(tp.Generic[M]):
 
         manager: ModuleManager[M] = self.copy()
 
+        if "method" not in kwargs:
+            method = getattr(manager.module, self.method_init)
+        else:
+            method = kwargs.pop("method")
+
+        if "training" not in kwargs:
+            arg_names = utils._function_argument_names(method)
+
+            if arg_names is not None and "training" in arg_names:
+                kwargs["training"] = self.training if self.initialized else False
+
         next_key, rngs = self._split_into(key, self.rngs_init)
 
-        variables = manager.module.init(rngs, *args, **kwargs).unfreeze()
+        variables = manager.module.init(rngs, *args, method=method, **kwargs).unfreeze()
 
         manager = manager.replace(  # type: ignore
             key=next_key,
@@ -89,21 +108,66 @@ class ModuleManager(tp.Generic[M]):
 
         return manager
 
-    @staticmethod
-    def _split_into(
-        key: jnp.ndarray,
-        rngs: tp.Sequence[str],
-    ) -> tp.Tuple[jnp.ndarray, tp.Dict[str, jnp.ndarray]]:
-        """
-        Split the key into the specified rngs.
-        """
+    def __call__(
+        self: "ModuleManager[M]",
+        *args,
+        **kwargs,
+    ) -> tp.Tuple[tp.Any, "ModuleManager[M]"]:
+        return self._forward(self.module.__call__, *args, **kwargs)
 
-        next_key, key = jax.random.split(key)
-        keys = jax.random.split(key, len(rngs))
+    def __getattr__(self, name: str) -> tp.Any:
 
-        keys_collection = {rng: keys[i] for i, rng in enumerate(rngs)}
+        method = getattr(self.module, name)
 
-        return next_key, keys_collection
+        if not callable(method):
+            raise AttributeError(f"module has no attribute '{name}'")
+
+        def wrapper(*args, **kwargs):
+            return self._forward(method, *args, **kwargs)
+
+        return wrapper
+
+    def _forward(
+        self: "ModuleManager[M]",
+        method: tp.Callable,
+        *args,
+        **kwargs,
+    ) -> tp.Tuple[tp.Any, "ModuleManager[M]"]:
+
+        manager: ModuleManager[M] = self.copy()
+
+        if manager.variables is None:
+            raise ValueError(
+                f"'variables' field is not set for module: {manager.module}"
+            )
+
+        if manager.key is None:
+            raise ValueError(f"'key' field is not set for module: {manager.module}")
+
+        if "training" not in kwargs:
+            arg_names = utils._function_argument_names(method)
+
+            if arg_names is not None and "training" in arg_names:
+                kwargs["training"] = self.training if self.initialized else False
+
+        next_key, rngs = self._split_into(manager.key, self.rngs_apply)
+
+        output, variables = manager.module.apply(
+            manager.variables,
+            *args,
+            rngs=rngs,
+            method=method,
+            mutable=self.mutable_train if manager.training else self.mutable_eval,
+            **kwargs,
+        )
+
+        manager = manager.replace(  # type: ignore
+            key=next_key,
+            variables=variables.unfreeze(),
+            hashable=utils.Hashable(manager.module),
+        )
+
+        return output, manager
 
     def __getitem__(self, key: str) -> tp.Any:
         if self.variables is None:
@@ -122,3 +186,19 @@ class ModuleManager(tp.Generic[M]):
             raise KeyError(f"'variables' field is not set for module: {self.module}")
 
         return key in self.variables
+
+    @staticmethod
+    def _split_into(
+        key: jnp.ndarray,
+        rngs: tp.Sequence[str],
+    ) -> tp.Tuple[jnp.ndarray, tp.Dict[str, jnp.ndarray]]:
+        """
+        Split the key into the specified rngs.
+        """
+
+        next_key, key = jax.random.split(key)
+        keys = jax.random.split(key, len(rngs))
+
+        keys_collection = {rng: keys[i] for i, rng in enumerate(rngs)}
+
+        return next_key, keys_collection
