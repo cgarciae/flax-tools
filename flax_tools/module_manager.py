@@ -3,7 +3,6 @@ import typing as tp
 import flax
 import flax.linen as nn
 import flax.struct
-import flax.training
 import jax
 import jax.numpy as jnp
 
