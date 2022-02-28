@@ -76,6 +76,19 @@ class ModuleManager(tp.Generic[M]):
             method_init=self.method_init,
         )
 
+    def train(self: "ModuleManager[M]", mode: bool = True) -> "ModuleManager[M]":
+        """
+        Set the module training mode.
+        """
+
+        return self.copy().replace(training=mode)
+
+    def eval(self: "ModuleManager[M]") -> "ModuleManager[M]":
+        """
+        Set the module to evaluation mode.
+        """
+        return self.train(mode=False)
+
     def init(
         self: "ModuleManager[M]", key: jnp.ndarray, *args, **kwargs
     ) -> "ModuleManager[M]":
@@ -152,8 +165,10 @@ class ModuleManager(tp.Generic[M]):
 
         next_key, rngs = self._split_into(manager.key, self.rngs_apply)
 
-        output, variables = manager.module.apply(
-            manager.variables,
+        variables = manager.variables.copy()
+
+        output, update = manager.module.apply(
+            variables,
             *args,
             rngs=rngs,
             method=method,
@@ -161,9 +176,11 @@ class ModuleManager(tp.Generic[M]):
             **kwargs,
         )
 
+        variables.update(update.unfreeze())
+
         manager = manager.replace(  # type: ignore
             key=next_key,
-            variables=variables.unfreeze(),
+            variables=variables,
             hashable=utils.Hashable(manager.module),
         )
 

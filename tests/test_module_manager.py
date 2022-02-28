@@ -150,3 +150,28 @@ class TestModuleManager:
         y, model = g(model, x)
 
         assert y.shape == (2, 4)
+
+    def test_eval(self):
+
+        x = np.random.uniform(size=(2, 3))
+        key = jax.random.PRNGKey(0)
+
+        module = Block()
+        model = ft.ModuleManager.new(module)
+
+        model = model.init(key, x)
+
+        y, model = model(x)
+
+        assert y.shape == (2, 4)
+
+        y2, model = model(x)
+
+        assert not np.allclose(y, y2)
+
+        model = model.eval()
+
+        y3, model = model(x)
+        y4, model = model(x)
+
+        assert np.allclose(y3, y4)
