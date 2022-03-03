@@ -17,7 +17,7 @@ class ModuleManager(tp.Generic[M]):
     variables: tp.Optional[tp.Dict[str, tp.Any]]
     key: tp.Optional[jnp.ndarray]
 
-    hashable: utils.Hashable[M] = flax.struct.field(pytree_node=False)
+    hashable_module: utils.Hashable[M] = flax.struct.field(pytree_node=False)
     training: bool = flax.struct.field(pytree_node=False)
     mutable_train: tp.Sequence[str] = flax.struct.field(pytree_node=False)
     mutable_eval: tp.Sequence[str] = flax.struct.field(pytree_node=False)
@@ -27,7 +27,7 @@ class ModuleManager(tp.Generic[M]):
 
     @property
     def module(self: "ModuleManager[M]") -> M:
-        return self.hashable.value
+        return self.hashable_module.value
 
     @property
     def initialized(self: "ModuleManager[M]") -> bool:
@@ -47,7 +47,7 @@ class ModuleManager(tp.Generic[M]):
         method_init: str = "__call__",
     ) -> "ModuleManager[M]":
         return cls(
-            hashable=utils.Hashable(module),
+            hashable_module=utils.Hashable(module),
             variables=variables,
             key=key,
             training=training,
@@ -64,7 +64,7 @@ class ModuleManager(tp.Generic[M]):
         """
 
         return self.__class__(
-            hashable=self.hashable,
+            hashable_module=self.hashable_module,
             variables=self.variables.copy() if self.variables is not None else None,
             key=self.key,
             training=self.training,
@@ -115,7 +115,7 @@ class ModuleManager(tp.Generic[M]):
         manager = manager.replace(  # type: ignore
             key=next_key,
             variables=variables,
-            hashable=utils.Hashable(manager.module),
+            hashable_module=utils.Hashable(manager.module),
         )
 
         return manager
@@ -180,7 +180,6 @@ class ModuleManager(tp.Generic[M]):
         manager = manager.replace(  # type: ignore
             key=next_key,
             variables=variables,
-            hashable=utils.Hashable(manager.module),
         )
 
         return output, manager

@@ -175,3 +175,46 @@ class TestModuleManager:
         y4, model = model(x)
 
         assert np.allclose(y3, y4)
+
+    def test_eval_jit(self):
+
+        x = np.random.uniform(size=(2, 3))
+        key = jax.random.PRNGKey(0)
+
+        Model = ft.ModuleManager[Block]
+
+        module = Block()
+        model: Model = ft.ModuleManager.new(module)
+
+        @jax.jit
+        def f(model: Model, key, x) -> Model:
+            return model.init(key, x)
+
+        model = f(model, key, x)
+
+        @jax.jit
+        def g(model: Model, x) -> tp.Tuple[jnp.ndarray, Model]:
+            print("JITTTING")
+            return model(x)
+
+        print()
+        print()
+        print("TRAIN")
+        y, model = g(model, x)
+        y, model = g(model, x)
+
+        print("EVAL")
+        model = model.eval()
+
+        y, model = g(model, x)
+        y, model = g(model, x)
+
+        model = model.train()
+
+        print("TRAIN")
+        y, model = g(model, x)
+        y, model = g(model, x)
+        print()
+        print()
+
+        assert y.shape == (2, 4)
