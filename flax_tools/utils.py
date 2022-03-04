@@ -5,6 +5,8 @@ import typing as tp
 import jax.numpy as jnp
 import numpy as np
 
+EPSILON = 1e-7
+
 A = tp.TypeVar("A")
 
 IndexLike = tp.Union[str, int, tp.Sequence[tp.Union[str, int]]]

@@ -1,6 +1,6 @@
 __version__ = "0.0.1"
 
-from .metrics import Metric, Metrics
+from .metrics import Metric, Metrics, Losses, AuxLosses, LossesAndMetrics
 from .losses import Loss
 from .module_manager import ModuleManager
 from .optimizer import Optimizer
@@ -13,4 +13,7 @@ __all__ = [
     "Metric",
     "Metrics",
     "Loss",
+    "Losses",
+    "AuxLosses",
+    "LossesAndMetrics",
 ]

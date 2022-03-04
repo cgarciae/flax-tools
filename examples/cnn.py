@@ -19,7 +19,7 @@ from tqdm import tqdm
 C = tp.TypeVar("C", bound=clu.metrics.Collection)
 
 
-AverageLoss = clu.metrics.Average.from_output("loss")
+Metrics = ft.LossesAndMetrics
 Batch = tp.Mapping[str, np.ndarray]
 Model = ft.ModuleManager["CNN"]
 Logs = tp.Dict[str, jnp.ndarray]
@@ -52,10 +52,10 @@ class CNN(nn.Module):
 def init_step(
     model: Model,
     optimizer: ft.Optimizer,
-    metrics: ft.Metrics,
+    metrics: Metrics,
     key: jnp.ndarray,
     inputs: tp.Any,
-) -> tp.Tuple[Model, ft.Optimizer, ft.Metrics]:
+) -> tp.Tuple[Model, ft.Optimizer, Metrics]:
     model = model.init(key, inputs)
     optimizer = optimizer.init(model["params"])
     metrics = metrics.reset()
@@ -66,18 +66,15 @@ def init_step(
 def loss_fn(
     params: tp.Any,
     model: Model,
-    metrics: ft.Metrics,
+    metrics: Metrics,
     x: jnp.ndarray,
     y: jnp.ndarray,
-) -> tp.Tuple[jnp.ndarray, tp.Tuple[Model, ft.Metrics]]:
+) -> tp.Tuple[jnp.ndarray, tp.Tuple[Model, Metrics]]:
     model["params"] = params
     preds, model = model(x)
-    loss = optax.softmax_cross_entropy(
-        logits=preds,
-        labels=jax.nn.one_hot(y, preds.shape[-1]),
-    ).mean()
 
-    metrics_update = metrics.get_updates(preds=preds, target=y, loss=loss)
+    metrics_update = metrics.get_updates(preds=preds, target=y)
+    loss = metrics_update.total_loss()
     metrics = metrics.merge(metrics_update)
 
     return loss, (model, metrics)
@@ -87,10 +84,10 @@ def loss_fn(
 def train_step(
     model: Model,
     optimizer: ft.Optimizer,
-    metrics: ft.Metric,
+    metrics: Metrics,
     x: jnp.ndarray,
     y: jnp.ndarray,
-) -> tp.Tuple[Logs, Model, ft.Optimizer, ft.Metric]:
+) -> tp.Tuple[Logs, Model, ft.Optimizer, Metrics]:
     print("JITTTTING")
     params = model["params"]
 
@@ -106,8 +103,8 @@ def train_step(
 
 @jax.jit
 def test_step(
-    model: Model, metrics: ft.Metric, x: jnp.ndarray, y: jnp.ndarray
-) -> tp.Tuple[Logs, ft.Metric]:
+    model: Model, metrics: Metrics, x: jnp.ndarray, y: jnp.ndarray
+) -> tp.Tuple[Logs, Metrics]:
 
     loss, (model, metrics) = loss_fn(model["params"], model, metrics, x, y)
 
@@ -143,11 +140,9 @@ def main(
     model: Model = ft.ModuleManager.new(CNN())
 
     optimizer = ft.Optimizer(optax.adamw(1e-3))
-    metrics = ft.Metrics.new(
-        [
-            ft.metrics.Accuracy.new(),
-            ft.metrics.Mean.new(name="loss").on_args("loss"),
-        ]
+    metrics = ft.LossesAndMetrics.new(
+        metrics=ft.metrics.Accuracy.new(),
+        losses=ft.losses.Crossentropy.new(),
     )
 
     model, optimizer, metrics = init_step(
@@ -184,7 +179,6 @@ def main(
             train_logs, model, optimizer, metrics = train_step(
                 model, optimizer, metrics, x, y
             )
-            train_logs
 
         history_train.append(train_logs)
 

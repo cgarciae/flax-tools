@@ -27,23 +27,8 @@ class Reduction(Enum):
     """
 
     # AUTO = "auto"
-    NONE = "none"
     SUM = "sum"
     SUM_OVER_BATCH_SIZE = "sum_over_batch_size"
-
-    @classmethod
-    def all(cls):
-        return (
-            # cls.AUTO,
-            cls.NONE,
-            cls.SUM,
-            cls.SUM_OVER_BATCH_SIZE,
-        )
-
-    @classmethod
-    def validate(cls, key):
-        if key not in cls.all():
-            raise ValueError("Invalid Reduction Key %s." % key)
 
 
 @flax.struct.dataclass
@@ -69,7 +54,7 @@ class Loss:
     """
 
     reduction: tp.Optional[Reduction] = flax.struct.field(pytree_node=False)
-    weight: jnp.ndarray = flax.struct.field(pytree_node=True)
+    weight: float = flax.struct.field(pytree_node=False)
     name: str = flax.struct.field(pytree_node=False)
     on: tp.Optional[tp.Sequence[tp.Union[str, int]]] = flax.struct.field(
         pytree_node=False
@@ -79,7 +64,7 @@ class Loss:
     def new(
         cls,
         reduction: tp.Optional[Reduction] = None,
-        weight: tp.Optional[utils.ScalarLike] = None,
+        weight: tp.Optional[float] = None,
         on: tp.Optional[utils.IndexLike] = None,
         name: tp.Optional[str] = None,
         **kwargs,
@@ -103,11 +88,7 @@ class Loss:
                 of the name of the class is used instead.
         """
         name = name if name is not None else utils._get_name(cls)
-        weight_: jnp.ndarray = (
-            jnp.asarray(weight, dtype=jnp.float32)
-            if weight is not None
-            else jnp.array(1.0, dtype=jnp.float32)
-        )
+        weight = float(weight) if weight is not None else 1.0
         reduction = (
             reduction if reduction is not None else Reduction.SUM_OVER_BATCH_SIZE
         )
@@ -115,7 +96,7 @@ class Loss:
 
         return cls(
             reduction=reduction,
-            weight=weight_,
+            weight=weight,
             name=name,
             on=on,
             **kwargs,
@@ -148,25 +129,23 @@ class Loss:
 def reduce_loss(
     values: jnp.ndarray,
     sample_weight: tp.Optional[jnp.ndarray],
-    weight: jnp.ndarray,
-    reduction: Reduction,
+    weight: float,
+    reduction: tp.Optional[Reduction],
 ) -> jnp.ndarray:
-
-    values = jnp.asarray(values)
 
     if sample_weight is not None:
         # expand `sample_weight` dimensions until it has the same rank as `values`
         while sample_weight.ndim < values.ndim:
-            sample_weight = sample_weight[..., jnp.newaxis]
+            sample_weight = sample_weight[..., None]
 
         values *= sample_weight
 
-    if reduction == Reduction.NONE:
+    if reduction is None:
         loss = values
     elif reduction == Reduction.SUM:
         loss = jnp.sum(values)
     elif reduction == Reduction.SUM_OVER_BATCH_SIZE:
-        loss = jnp.sum(values) / jnp.prod(jnp.array(values.shape))
+        loss = jnp.mean(values)
     else:
         raise ValueError(f"Invalid reduction '{reduction}'")
 

@@ -27,13 +27,12 @@ def crossentropy(
     label_smoothing: tp.Optional[float] = None,
 ) -> jnp.ndarray:
 
-    n_classes = preds.shape[-1]
-
     if target.ndim == preds.ndim - 1:
         if target.shape != preds.shape[:-1]:
             raise ValueError(
                 f"Target shape '{target.shape}' does not match preds shape '{preds.shape}'"
             )
+        n_classes = preds.shape[-1]
         target = jax.nn.one_hot(target, n_classes)
     else:
         if target.ndim != preds.ndim:
@@ -46,18 +45,20 @@ def crossentropy(
 
     if from_logits:
         if binary:
-            loss = optax.sigmoid_binary_cross_entropy(preds, target).mean(axis=-1)
+            loss = optax.sigmoid_binary_cross_entropy(logits=preds, labels=target).mean(
+                axis=-1
+            )
         else:
-            loss = optax.softmax_cross_entropy(preds, target)
+            loss = optax.softmax_cross_entropy(logits=preds, labels=target)
     else:
-        preds = jnp.clip(preds, types.EPSILON, 1.0 - types.EPSILON)
+        preds = jnp.clip(preds, utils.EPSILON, 1.0 - utils.EPSILON)
 
         if binary:
             loss = target * jnp.log(preds)  # + types.EPSILON)
             loss += (1 - target) * jnp.log(1 - preds)  # + types.EPSILON)
-            loss = -loss.mean(axis=-1)
+            loss = -jnp.mean(loss, axis=-1)
         else:
-            loss = -(target * jnp.log(preds)).sum(axis=-1)
+            loss = -jnp.sum(target * jnp.log(preds), axis=-1)
 
     return loss
 
