@@ -39,7 +39,7 @@ class Metric(ABC):
     def compute(self) -> tp.Any:
         ...
 
-    def get_updates(self: M, **kwargs) -> M:
+    def batch_updates(self: M, **kwargs) -> M:
         return self.reset().update(**kwargs)
 
     def merge(self: M, other: M) -> M:

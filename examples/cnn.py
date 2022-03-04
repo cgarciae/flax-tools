@@ -73,9 +73,9 @@ def loss_fn(
     model["params"] = params
     preds, model = model(x)
 
-    metrics_update = metrics.get_updates(preds=preds, target=y)
-    loss = metrics_update.total_loss()
-    metrics = metrics.merge(metrics_update)
+    batch_updates = metrics.batch_updates(preds=preds, target=y)
+    loss = batch_updates.total_loss()
+    metrics = metrics.merge(batch_updates)
 
     return loss, (model, metrics)
 
