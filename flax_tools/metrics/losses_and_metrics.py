@@ -19,15 +19,25 @@ class LossesAndMetrics(Metric):
         metrics: tp.Any,
         name: tp.Optional[str] = None,
         on: tp.Optional[utils.IndexLike] = None,
-        **kwargs,
+        kwargs: tp.Optional[tp.Dict[str, tp.Any]] = None,
     ):
+        if kwargs is None:
+            kwargs = {}
         if not isinstance(losses, Losses):
             losses = Losses.new(losses)
 
         if not isinstance(metrics, Metrics):
             metrics = Metrics.new(metrics)
 
-        return super().new(name=name, on=on, losses=losses, metrics=metrics, **kwargs)
+        return super().new(
+            name=name,
+            on=on,
+            kwargs=dict(
+                losses=losses,
+                metrics=metrics,
+                **kwargs,
+            ),
+        )
 
     def reset(self) -> "LossesAndMetrics":
         return self.replace(  # type: ignore

@@ -15,8 +15,11 @@ class Metrics(Metric):
         metrics: tp.Any,
         name: tp.Optional[str] = None,
         on: tp.Optional[utils.IndexLike] = None,
-        **kwargs,
+        kwargs: tp.Optional[tp.Dict[str, tp.Any]] = None,
     ):
+        if kwargs is None:
+            kwargs = {}
+
         names: tp.Set[str] = set()
 
         def get_name(path, metric):
@@ -28,7 +31,14 @@ class Metrics(Metric):
             for path, metric in utils._flatten_names(metrics)
         }
 
-        return super().new(name=name, on=on, metrics=metrics, **kwargs)
+        return super().new(
+            name=name,
+            on=on,
+            kwargs=dict(
+                metrics=metrics,
+                **kwargs,
+            ),
+        )
 
     def reset(self):
         metrics = jax.tree_map(

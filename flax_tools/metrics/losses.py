@@ -44,9 +44,11 @@ class Losses(Metric):
         return super().new(
             name=name,
             on=on,
-            losses=losses,
-            totals=None,
-            counts=None,
+            kwargs=dict(
+                losses=losses,
+                totals=None,
+                counts=None,
+            ),
         )
 
     def reset(self: "Losses") -> "Losses":
@@ -93,8 +95,10 @@ class AuxLosses(Metric):
         return super().new(
             name=name,
             on=on,
-            totals=None,
-            counts=None,
+            kwargs=dict(
+                totals=None,
+                counts=None,
+            ),
         )
 
     def reset(

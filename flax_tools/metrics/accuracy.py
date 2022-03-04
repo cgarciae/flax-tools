@@ -1,11 +1,12 @@
 import typing
-import typing as tp
 
 import jax.numpy as jnp
 from flax_tools import utils
 from flax_tools.metrics import metrics_utils
 from flax_tools.metrics.metric import Metric
 from flax_tools.metrics.metrics_utils import AverageMethod, DataType, MDMCAverageMethod
+
+# WARNING: dont use 'typing as tp' here, it will get confused with Accuracy.tp
 
 
 @utils.dataclass
@@ -145,10 +146,10 @@ class Accuracy(Metric):
         tensor(0.6667)
 
     """
-    tp: jnp.ndarray = utils.node()
-    fp: jnp.ndarray = utils.node()
-    tn: jnp.ndarray = utils.node()
-    fn: jnp.ndarray = utils.node()
+    tp: typing.Optional[jnp.ndarray] = utils.node()
+    fp: typing.Optional[jnp.ndarray] = utils.node()
+    tn: typing.Optional[jnp.ndarray] = utils.node()
+    fn: typing.Optional[jnp.ndarray] = utils.node()
 
     threshold: float = utils.static()
     num_classes: typing.Optional[int] = utils.static()
@@ -159,11 +160,11 @@ class Accuracy(Metric):
     multiclass: typing.Optional[bool] = utils.static()
     subset_accuracy: bool = utils.static()
     mode: DataType = utils.static()
-    on: typing.Optional[utils.IndexLike] = utils.static()
-    name: typing.Optional[str] = utils.static()
+    zeros_shape: typing.Tuple[int, ...] = utils.static()
 
-    def __init__(
-        self,
+    @classmethod
+    def new(
+        cls,
         threshold: float = 0.5,
         num_classes: typing.Optional[int] = None,
         average: typing.Union[str, AverageMethod] = AverageMethod.MICRO,
@@ -176,8 +177,6 @@ class Accuracy(Metric):
         on: typing.Optional[utils.IndexLike] = None,
         name: typing.Optional[str] = None,
     ):
-
-        super().__init__(on=on, name=name)
 
         if isinstance(average, str):
             average = AverageMethod[average.upper()]
@@ -226,32 +225,46 @@ class Accuracy(Metric):
                 f"The `mdmc_average` method '{mdmc_average}' is not yet supported."
             )
 
-        self.average = average
-        self.mdmc_average = mdmc_average
-        self.num_classes = num_classes
-        self.threshold = threshold
-        self.multiclass = multiclass
-        self.ignore_index = ignore_index
-        self.top_k = top_k
-        self.subset_accuracy = subset_accuracy
-        self.mode = mode
-
-        # nodes
         if average == AverageMethod.MICRO:
-            zeros_shape = []
+            zeros_shape = ()
         elif average == AverageMethod.MACRO:
-            zeros_shape = [num_classes]
+            zeros_shape = (num_classes,)
         else:
             raise ValueError(f'Wrong reduce="{average}"')
 
-        initial_value = jnp.zeros(zeros_shape, dtype=jnp.uint32)
+        return super().new(
+            name=name,
+            on=on,
+            kwargs=dict(
+                tp=None,
+                fp=None,
+                tn=None,
+                fn=None,
+                threshold=threshold,
+                num_classes=num_classes,
+                average=average,
+                mdmc_average=mdmc_average,
+                ignore_index=ignore_index,
+                top_k=top_k,
+                multiclass=multiclass,
+                subset_accuracy=subset_accuracy,
+                mode=mode,
+                zeros_shape=zeros_shape,
+            ),
+        )
 
-        self.tp = initial_value
-        self.fp = initial_value
-        self.tn = initial_value
-        self.fn = initial_value
+    def reset(self) -> "Accuracy":
 
-    def update(self, preds: jnp.ndarray, target: jnp.ndarray) -> None:  # type: ignore
+        initial_value = jnp.zeros(self.zeros_shape, dtype=jnp.uint32)
+
+        return self.replace(  # type: ignore
+            tp=initial_value,
+            fp=initial_value,
+            tn=initial_value,
+            fn=initial_value,
+        )
+
+    def update(self, preds: jnp.ndarray, target: jnp.ndarray, **_) -> "Accuracy":
         """Update state with predictions and targets. See
         :ref:`references/modules:input utils` for more information on input
         utils.
@@ -273,10 +286,12 @@ class Accuracy(Metric):
             multiclass=self.multiclass,
         )
 
-        self.tp += tp
-        self.fp += fp
-        self.tn += tn
-        self.fn += fn
+        return self.replace(  # type: ignore
+            tp=self.tp + tp,
+            fp=self.fp + fp,
+            tn=self.tn + tn,
+            fn=self.fn + fn,
+        )
 
     def compute(self) -> jnp.ndarray:
         """Computes accuracy based on inputs passed in to ``update`` previously."""

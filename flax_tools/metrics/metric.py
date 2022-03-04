@@ -14,8 +14,14 @@ class Metric(ABC):
 
     @classmethod
     def new(
-        cls, name: tp.Optional[str], on: tp.Optional[utils.IndexLike] = None, **kwargs
+        cls,
+        name: tp.Optional[str],
+        on: tp.Optional[utils.IndexLike] = None,
+        kwargs: tp.Optional[tp.Dict[str, tp.Any]] = None,
     ):
+        if kwargs is None:
+            kwargs = {}
+
         if name is None:
             name = utils._get_name(cls)
 
@@ -62,8 +68,10 @@ class MapArgs(Metric):
         return super().new(
             name=metric.name,
             on=None,
-            metric=metric,
-            args_map=args_map,
+            kwargs=dict(
+                metric=metric,
+                args_map=args_map,
+            ),
         )
 
     def reset(self: M) -> M:

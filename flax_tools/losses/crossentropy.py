@@ -160,9 +160,11 @@ class Crossentropy(Loss):
             weight=weight,
             on=on,
             name=name,
-            from_logits=from_logits,
-            binary=binary,
-            label_smoothing=label_smoothing,
+            kwargs=dict(
+                from_logits=from_logits,
+                binary=binary,
+                label_smoothing=label_smoothing,
+            ),
         )
 
     def call(

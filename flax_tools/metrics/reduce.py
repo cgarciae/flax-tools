@@ -29,13 +29,23 @@ class Reduce(Metric):
         reduction: tp.Union[Reduction, str],
         name: tp.Optional[str] = None,
         on: tp.Optional[utils.IndexLike] = None,
-        **kwargs,
+        kwargs: tp.Optional[tp.Dict[str, tp.Any]] = None,
     ):
+        if kwargs is None:
+            kwargs = {}
+
         if not isinstance(reduction, Reduction):
             reduction = Reduction[reduction]
 
         return super().new(
-            name=name, on=on, total=None, count=None, reduction=reduction, **kwargs
+            name=name,
+            on=on,
+            kwargs=dict(
+                total=None,
+                count=None,
+                reduction=reduction,
+                **kwargs,
+            ),
         )
 
     def reset(self: R) -> R:

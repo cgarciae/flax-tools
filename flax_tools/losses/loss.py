@@ -64,7 +64,7 @@ class Loss:
         weight: tp.Optional[float] = None,
         on: tp.Optional[utils.IndexLike] = None,
         name: tp.Optional[str] = None,
-        **kwargs,
+        kwargs: tp.Optional[tp.Dict[str, tp.Any]] = None,
     ):
         """
         Initializes `Loss` class.
@@ -84,6 +84,9 @@ class Loss:
             name: Optional name for the instance, if not provided lower snake_case version
                 of the name of the class is used instead.
         """
+        if kwargs is None:
+            kwargs = {}
+
         name = name if name is not None else utils._get_name(cls)
         weight = float(weight) if weight is not None else 1.0
         reduction = (
