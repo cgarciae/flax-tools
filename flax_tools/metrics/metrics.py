@@ -1,14 +1,13 @@
 import typing as tp
 
-import flax.struct
 import jax
 from flax_tools import utils
 from flax_tools.metrics.metric import Metric
 
 
-@flax.struct.dataclass
+@utils.dataclass
 class Metrics(Metric):
-    metrics: tp.Any = flax.struct.field()
+    metrics: tp.Any = utils.node()
 
     @classmethod
     def new(

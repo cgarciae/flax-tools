@@ -1,19 +1,16 @@
 import typing as tp
 from abc import ABC, abstractmethod
 
-import flax.struct
 import jax
 from flax_tools import utils
 
 M = tp.TypeVar("M", bound="Metric")
 
 
-@flax.struct.dataclass
+@utils.dataclass
 class Metric(ABC):
-    name: str = flax.struct.field(pytree_node=False)
-    on: tp.Optional[tp.Sequence[tp.Union[int, str]]] = flax.struct.field(
-        pytree_node=False
-    )
+    name: str = utils.static()
+    on: tp.Optional[tp.Sequence[tp.Union[int, str]]] = utils.static()
 
     @classmethod
     def new(
@@ -55,10 +52,10 @@ class Metric(ABC):
         return args
 
 
-@flax.struct.dataclass
+@utils.dataclass
 class MapArgs(Metric):
-    metric: Metric = flax.struct.field()
-    args_map: tp.Dict[str, str] = flax.struct.field(pytree_node=False)
+    metric: Metric = utils.node()
+    args_map: tp.Dict[str, str] = utils.static()
 
     @classmethod
     def new(cls, metric: Metric, args_map: tp.Dict[str, str]):

@@ -1,6 +1,5 @@
 import typing as tp
 
-import flax.struct
 import jax.numpy as jnp
 from flax_tools import utils
 from flax_tools.metrics.losses import Losses
@@ -8,10 +7,10 @@ from flax_tools.metrics.metric import Metric
 from flax_tools.metrics.metrics import Metrics
 
 
-@flax.struct.dataclass
+@utils.dataclass
 class LossesAndMetrics(Metric):
-    losses: Losses = flax.struct.field()
-    metrics: Metrics = flax.struct.field()
+    losses: Losses = utils.node()
+    metrics: Metrics = utils.node()
 
     @classmethod
     def new(

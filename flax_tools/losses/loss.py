@@ -6,7 +6,6 @@ import typing as tp
 from abc import abstractmethod
 from enum import Enum
 
-import flax.struct
 import jax.numpy as jnp
 import numpy as np
 
@@ -31,7 +30,7 @@ class Reduction(Enum):
     SUM_OVER_BATCH_SIZE = "sum_over_batch_size"
 
 
-@flax.struct.dataclass
+@utils.dataclass
 class Loss:
     """
     Loss base class.
@@ -53,12 +52,10 @@ class Loss:
     details on this.
     """
 
-    reduction: tp.Optional[Reduction] = flax.struct.field(pytree_node=False)
-    weight: float = flax.struct.field(pytree_node=False)
-    name: str = flax.struct.field(pytree_node=False)
-    on: tp.Optional[tp.Sequence[tp.Union[str, int]]] = flax.struct.field(
-        pytree_node=False
-    )
+    reduction: tp.Optional[Reduction] = utils.static()
+    weight: float = utils.static()
+    name: str = utils.static()
+    on: tp.Optional[tp.Sequence[tp.Union[str, int]]] = utils.static()
 
     @classmethod
     def new(

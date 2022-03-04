@@ -5,7 +5,6 @@ from functools import partial
 import clu
 import clu.metrics
 import flax.linen as nn
-import flax.struct
 import flax_tools as ft
 import jax
 import jax.numpy as jnp

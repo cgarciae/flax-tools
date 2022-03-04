@@ -1,7 +1,6 @@
 import typing as tp
 
 import flax
-import flax.struct
 import jax
 import jax.numpy as jnp
 import optax
@@ -63,7 +62,7 @@ def crossentropy(
     return loss
 
 
-@flax.struct.dataclass
+@utils.dataclass
 class Crossentropy(Loss):
     """
     Computes the crossentropy loss between the target and predictions.
@@ -120,9 +119,9 @@ class Crossentropy(Loss):
     ```
     """
 
-    from_logits: bool = flax.struct.field(pytree_node=False)
-    binary: bool = flax.struct.field(pytree_node=False)
-    label_smoothing: tp.Optional[float] = flax.struct.field(pytree_node=False)
+    from_logits: bool = utils.static()
+    binary: bool = utils.static()
+    label_smoothing: tp.Optional[float] = utils.static()
 
     @classmethod
     def new(

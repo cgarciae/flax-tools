@@ -1,7 +1,6 @@
 import enum
 import typing as tp
 
-import flax.struct
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -18,11 +17,11 @@ class Reduction(enum.Enum):
 R = tp.TypeVar("R", bound="Reduce")
 
 
-@flax.struct.dataclass
+@utils.dataclass
 class Reduce(Metric):
-    total: tp.Optional[jnp.ndarray] = flax.struct.field()
-    count: tp.Optional[jnp.ndarray] = flax.struct.field()
-    reduction: Reduction = flax.struct.field(pytree_node=False)
+    total: tp.Optional[jnp.ndarray] = utils.node()
+    count: tp.Optional[jnp.ndarray] = utils.node()
+    reduction: Reduction = utils.static()
 
     @classmethod
     def new(

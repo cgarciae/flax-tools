@@ -2,7 +2,6 @@ import typing as tp
 
 import flax
 import flax.linen as nn
-import flax.struct
 import jax
 import jax.numpy as jnp
 
@@ -11,19 +10,19 @@ from flax_tools import utils
 M = tp.TypeVar("M", bound="nn.module.Module")
 
 
-@flax.struct.dataclass
+@utils.dataclass
 class ModuleManager(tp.Generic[M]):
 
     variables: tp.Optional[tp.Dict[str, tp.Any]]
     key: tp.Optional[jnp.ndarray]
 
-    hashable_module: utils.Hashable[M] = flax.struct.field(pytree_node=False)
-    training: bool = flax.struct.field(pytree_node=False)
-    mutable_train: tp.Sequence[str] = flax.struct.field(pytree_node=False)
-    mutable_eval: tp.Sequence[str] = flax.struct.field(pytree_node=False)
-    rngs_init: tp.Sequence[str] = flax.struct.field(pytree_node=False)
-    rngs_apply: tp.Sequence[str] = flax.struct.field(pytree_node=False)
-    method_init: str = flax.struct.field(pytree_node=False)
+    hashable_module: utils.Hashable[M] = utils.static()
+    training: bool = utils.static()
+    mutable_train: tp.Sequence[str] = utils.static()
+    mutable_eval: tp.Sequence[str] = utils.static()
+    rngs_init: tp.Sequence[str] = utils.static()
+    rngs_apply: tp.Sequence[str] = utils.static()
+    method_init: str = utils.static()
 
     @property
     def module(self: "ModuleManager[M]") -> M:

@@ -4,7 +4,7 @@ from .metrics import Metric, Metrics, Losses, AuxLosses, LossesAndMetrics
 from .losses import Loss
 from .module_manager import ModuleManager
 from .optimizer import Optimizer
-from .utils import Hashable
+from .utils import Hashable, field, node, static, dataclass
 
 __all__ = [
     "Hashable",
@@ -16,4 +16,8 @@ __all__ = [
     "Losses",
     "AuxLosses",
     "LossesAndMetrics",
+    "field",
+    "node",
+    "static",
+    "dataclass",
 ]

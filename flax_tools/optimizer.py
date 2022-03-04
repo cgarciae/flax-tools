@@ -1,24 +1,25 @@
-from email.policy import default
 import functools
 import inspect
 import typing as tp
+from email.policy import default
 
 import flax
 import flax.linen as nn
-import flax.struct
 import jax
 import jax.numpy as jnp
 import optax
+
+from flax_tools import utils
 
 A = tp.TypeVar("A", bound="tp.Any")
 G = tp.TypeVar("G", bound="optax.GradientTransformation")
 
 
-@flax.struct.dataclass
+@utils.dataclass
 class Optimizer(tp.Generic[G]):
 
-    optimizer: G = flax.struct.field(pytree_node=False)
-    opt_state: tp.Optional[tp.Any] = flax.struct.field(default=None)
+    optimizer: G = utils.static()
+    opt_state: tp.Optional[tp.Any] = utils.node(default=None)
 
     @property
     def initialized(self) -> bool:

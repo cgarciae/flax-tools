@@ -1,6 +1,5 @@
 import typing as tp
 
-import flax.struct
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -11,11 +10,11 @@ from flax_tools.losses.loss import Loss
 from flax_tools.metrics.metric import Metric
 
 
-@flax.struct.dataclass
+@utils.dataclass
 class Losses(Metric):
-    losses: tp.Dict[str, Loss] = flax.struct.field()
-    totals: tp.Optional[tp.Dict[str, jnp.ndarray]] = flax.struct.field()
-    counts: tp.Optional[tp.Dict[str, jnp.ndarray]] = flax.struct.field()
+    losses: tp.Dict[str, Loss] = utils.node()
+    totals: tp.Optional[tp.Dict[str, jnp.ndarray]] = utils.node()
+    counts: tp.Optional[tp.Dict[str, jnp.ndarray]] = utils.node()
 
     @classmethod
     def new(
@@ -80,10 +79,10 @@ class Losses(Metric):
         return {name: self.totals[name] / self.counts[name] for name in self.totals}
 
 
-@flax.struct.dataclass
+@utils.dataclass
 class AuxLosses(Metric):
-    totals: tp.Optional[tp.Dict[str, jnp.ndarray]] = flax.struct.field()
-    counts: tp.Optional[tp.Dict[str, jnp.ndarray]] = flax.struct.field()
+    totals: tp.Optional[tp.Dict[str, jnp.ndarray]] = utils.node()
+    counts: tp.Optional[tp.Dict[str, jnp.ndarray]] = utils.node()
 
     @classmethod
     def new(

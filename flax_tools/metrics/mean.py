@@ -2,7 +2,6 @@ from dataclasses import dataclass
 import enum
 import typing as tp
 
-import flax.struct
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -11,7 +10,7 @@ from flax_tools.metrics.metric import Metric, MapArgs
 from flax_tools.metrics.reduce import Reduce, Reduction
 
 
-@flax.struct.dataclass
+@utils.dataclass
 class Mean(Reduce):
     @classmethod
     def new(

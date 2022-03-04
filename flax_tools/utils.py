@@ -1,9 +1,12 @@
 import inspect
 import re
 import typing as tp
+from dataclasses import MISSING
 
+import flax.struct
 import jax.numpy as jnp
 import numpy as np
+from flax.struct import dataclass
 
 EPSILON = 1e-7
 
@@ -25,6 +28,64 @@ class Hashable(tp.Generic[A]):
 
     def __setattr__(self, name: str, value: tp.Any) -> None:
         raise AttributeError(f"Hashable is immutable")
+
+
+def field(
+    pytree_node: bool = True,
+    default: tp.Any = MISSING,
+    default_factory: tp.Any = MISSING,
+    init: bool = True,
+    repr: bool = True,
+    hash: tp.Optional[bool] = None,
+    compare: bool = True,
+):
+    return flax.struct.field(
+        pytree_node=pytree_node,
+        default=default,
+        default_factory=default_factory,
+        init=init,
+        repr=repr,
+        hash=hash,
+        compare=compare,
+    )
+
+
+def node(
+    default: tp.Any = MISSING,
+    default_factory: tp.Any = MISSING,
+    init: bool = True,
+    repr: bool = True,
+    hash: tp.Optional[bool] = None,
+    compare: bool = True,
+):
+    return flax.struct.field(
+        pytree_node=True,
+        default=default,
+        default_factory=default_factory,
+        init=init,
+        repr=repr,
+        hash=hash,
+        compare=compare,
+    )
+
+
+def static(
+    default: tp.Any = MISSING,
+    default_factory: tp.Any = MISSING,
+    init: bool = True,
+    repr: bool = True,
+    hash: tp.Optional[bool] = None,
+    compare: bool = True,
+):
+    return flax.struct.field(
+        pytree_node=False,
+        default=default,
+        default_factory=default_factory,
+        init=init,
+        repr=repr,
+        hash=hash,
+        compare=compare,
+    )
 
 
 def _function_argument_names(f) -> tp.Optional[tp.List[str]]:
