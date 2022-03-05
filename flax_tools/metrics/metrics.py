@@ -45,7 +45,7 @@ class Metrics(Metric):
             lambda m: m.reset(), self.metrics, is_leaf=lambda x: isinstance(x, Metric)
         )
 
-        return self.replace(metrics=metrics)  # type: ignore
+        return self.replace(metrics=metrics)
 
     def update(self, **kwargs):
         metrics = jax.tree_map(
@@ -54,7 +54,7 @@ class Metrics(Metric):
             is_leaf=lambda x: isinstance(x, Metric),
         )
 
-        return self.replace(metrics=metrics)  # type: ignore
+        return self.replace(metrics=metrics)
 
     def compute(self) -> tp.Any:
         return jax.tree_map(
@@ -71,4 +71,4 @@ class Metrics(Metric):
             is_leaf=lambda x: isinstance(x, Metric),
         )
 
-        return self.replace(metrics=metrics)  # type: ignore
+        return self.replace(metrics=metrics)

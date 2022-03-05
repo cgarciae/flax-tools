@@ -8,7 +8,7 @@ M = tp.TypeVar("M", bound="Metric")
 
 
 @utils.dataclass
-class Metric(ABC):
+class Metric(ABC, utils.Immutable):
     name: str = utils.static()
     on: tp.Optional[tp.Sequence[tp.Union[int, str]]] = utils.static()
 
@@ -75,7 +75,7 @@ class MapArgs(Metric):
         )
 
     def reset(self: M) -> M:
-        return self.replace(metric=self.metric.reset())  # type: ignore
+        return self.replace(metric=self.metric.reset())
 
     def update(self, **kwargs) -> "MapArgs":
 
@@ -94,7 +94,7 @@ class MapArgs(Metric):
         # add new kwargs
         kwargs.update(kwarg_updates)
 
-        return self.replace(metric=self.metric.update(**kwargs))  # type: ignore
+        return self.replace(metric=self.metric.update(**kwargs))
 
     def compute(self) -> tp.Any:
         return self.metric.compute()

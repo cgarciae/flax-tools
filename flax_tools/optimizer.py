@@ -16,16 +16,16 @@ G = tp.TypeVar("G", bound="optax.GradientTransformation")
 
 
 @utils.dataclass
-class Optimizer(tp.Generic[G]):
+class Optimizer(utils.Immutable):
 
-    optimizer: G = utils.static()
+    optimizer: optax.GradientTransformation = utils.static()
     opt_state: tp.Optional[tp.Any] = utils.node(default=None)
 
     @property
     def initialized(self) -> bool:
         return self.opt_state is not None
 
-    def init(self: "Optimizer[G]", params: tp.Any) -> "Optimizer[G]":
+    def init(self, params: tp.Any) -> "Optimizer":
         """
         Initialize the optimizer from an initial set of parameters.
 
@@ -37,11 +37,11 @@ class Optimizer(tp.Generic[G]):
         """
 
         opt_state = self.optimizer.init(params)
-        return self.replace(opt_state=opt_state)  # type: ignore
+        return self.replace(opt_state=opt_state)
 
     def update(
         self, grads: A, params: A, apply_updates: bool = True
-    ) -> tp.Tuple[A, "Optimizer[G]"]:
+    ) -> tp.Tuple[A, "Optimizer"]:
         """
         Applies the parameters updates and updates the optimizers internal state inplace.
 
@@ -70,6 +70,6 @@ class Optimizer(tp.Generic[G]):
         else:
             output = param_updates
 
-        optimizer = self.replace(opt_state=opt_state)  # type: ignore
+        optimizer = self.replace(opt_state=opt_state)
 
         return output, optimizer

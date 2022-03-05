@@ -31,7 +31,7 @@ class Reduction(Enum):
 
 
 @utils.dataclass
-class Loss:
+class Loss(utils.Immutable):
     """
     Loss base class.
 

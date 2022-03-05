@@ -55,7 +55,7 @@ class Losses(Metric):
         totals = {name: jnp.array(0.0, dtype=jnp.float32) for name in self.losses}
         counts = {name: jnp.array(0, dtype=jnp.uint32) for name in self.losses}
 
-        return self.replace(totals=totals, counts=counts)  # type: ignore
+        return self.replace(totals=totals, counts=counts)
 
     def update(self, **kwargs) -> "Losses":
 
@@ -72,7 +72,7 @@ class Losses(Metric):
             totals[name] = (self.totals[name] + value).astype(jnp.float32)
             counts[name] = (self.counts[name] + 1).astype(jnp.uint32)
 
-        return self.replace(totals=totals, counts=counts)  # type: ignore
+        return self.replace(totals=totals, counts=counts)
 
     def compute(self) -> tp.Dict[str, jnp.ndarray]:
         if self.totals is None or self.counts is None:
@@ -129,7 +129,7 @@ class AuxLosses(Metric):
         totals = {name: jnp.array(0.0, dtype=jnp.float32) for name in dict_shape}
         counts = {name: jnp.array(0, dtype=jnp.uint32) for name in dict_shape}
 
-        return self.replace(totals=totals, counts=counts)  # type: ignore
+        return self.replace(totals=totals, counts=counts)
 
     def update(self, aux_losses: tp.Dict[str, tp.Any], **_) -> "AuxLosses":
         aux_losses = dict(utils._flatten_names(aux_losses))

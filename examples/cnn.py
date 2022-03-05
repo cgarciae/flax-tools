@@ -69,7 +69,9 @@ def loss_fn(
     x: jnp.ndarray,
     y: jnp.ndarray,
 ) -> tp.Tuple[jnp.ndarray, tp.Tuple[Model, Metrics]]:
-    model["params"] = params
+    preds: jnp.ndarray
+
+    model = model.update(params=params)
     preds, model = model(x)
 
     batch_updates = metrics.batch_updates(preds=preds, target=y)
@@ -94,7 +96,8 @@ def train_step(
         params, model, metrics, x, y
     )
 
-    model["params"], optimizer = optimizer.update(grads, params)
+    params, optimizer = optimizer.update(grads, params)
+    model = model.update(params=params)
     logs = metrics.compute()
 
     return logs, model, optimizer, metrics

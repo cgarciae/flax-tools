@@ -304,7 +304,7 @@ def _input_format_classification(
 
             preds = jax.nn.one_hot(preds, max(2, num_classes))
 
-        target = jax.nn.one_hot(target, max(2, num_classes))  # type: ignore
+        target = jax.nn.one_hot(target, max(2, num_classes))
 
         if multiclass is False:
             preds, target = preds[..., 1], target[..., 1]

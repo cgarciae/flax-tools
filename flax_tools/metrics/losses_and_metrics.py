@@ -40,13 +40,13 @@ class LossesAndMetrics(Metric):
         )
 
     def reset(self) -> "LossesAndMetrics":
-        return self.replace(  # type: ignore
+        return self.replace(
             losses=self.losses.reset(),
             metrics=self.metrics.reset(),
         )
 
     def update(self, **kwargs) -> "LossesAndMetrics":
-        return self.replace(  # type: ignore
+        return self.replace(
             losses=self.losses.update(**kwargs),
             metrics=self.metrics.update(**kwargs),
         )

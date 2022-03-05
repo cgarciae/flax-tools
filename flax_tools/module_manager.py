@@ -1,19 +1,22 @@
 import typing as tp
 
 import flax
+from flax.core.frozen_dict import FrozenDict
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
 
 from flax_tools import utils
 
+FrozerVariables = FrozenDict[str, tp.Mapping[str, tp.Any]]
+Variables = tp.Mapping[str, tp.Mapping[str, tp.Any]]
 M = tp.TypeVar("M", bound="nn.module.Module")
 
 
 @utils.dataclass
-class ModuleManager(tp.Generic[M]):
+class ModuleManager(tp.Generic[M], utils.Immutable):
 
-    variables: tp.Optional[tp.Dict[str, tp.Any]]
+    variables: tp.Optional[FrozerVariables]
     key: tp.Optional[jnp.ndarray]
 
     hashable_module: utils.Hashable[M] = utils.static()
@@ -36,7 +39,7 @@ class ModuleManager(tp.Generic[M]):
     def new(
         cls,
         module: M,
-        variables: tp.Optional[tp.Dict[str, tp.Any]] = None,
+        variables: tp.Optional[Variables] = None,
         key: tp.Optional[jnp.ndarray] = None,
         training: bool = True,
         mutable_train: tp.Sequence[str] = ("batch_stats", "cache"),
@@ -47,7 +50,7 @@ class ModuleManager(tp.Generic[M]):
     ) -> "ModuleManager[M]":
         return cls(
             hashable_module=utils.Hashable(module),
-            variables=variables,
+            variables=FrozenDict(variables) if variables is not None else None,
             key=key,
             training=training,
             mutable_train=mutable_train,
@@ -57,29 +60,12 @@ class ModuleManager(tp.Generic[M]):
             method_init=method_init,
         )
 
-    def copy(self: "ModuleManager[M]") -> "ModuleManager[M]":
-        """
-        Copy the module.
-        """
-
-        return self.__class__(
-            hashable_module=self.hashable_module,
-            variables=self.variables.copy() if self.variables is not None else None,
-            key=self.key,
-            training=self.training,
-            mutable_train=tuple(self.mutable_train),
-            mutable_eval=tuple(self.mutable_eval),
-            rngs_init=tuple(self.rngs_init),
-            rngs_apply=tuple(self.rngs_apply),
-            method_init=self.method_init,
-        )
-
     def train(self: "ModuleManager[M]", mode: bool = True) -> "ModuleManager[M]":
         """
         Set the module training mode.
         """
 
-        return self.copy().replace(training=mode)
+        return self.replace(training=mode)
 
     def eval(self: "ModuleManager[M]") -> "ModuleManager[M]":
         """
@@ -94,7 +80,7 @@ class ModuleManager(tp.Generic[M]):
         Initialize the module.
         """
 
-        manager: ModuleManager[M] = self.copy()
+        manager: ModuleManager[M] = self
 
         if "method" not in kwargs:
             method = getattr(manager.module, self.method_init)
@@ -109,9 +95,12 @@ class ModuleManager(tp.Generic[M]):
 
         next_key, rngs = self._split_into(key, self.rngs_init)
 
-        variables = manager.module.init(rngs, *args, method=method, **kwargs).unfreeze()
+        variables = manager.module.init(rngs, *args, method=method, **kwargs)
 
-        manager = manager.replace(  # type: ignore
+        if not isinstance(variables, FrozenDict):
+            variables = FrozenDict(variables)
+
+        manager = manager.replace(
             key=next_key,
             variables=variables,
             hashable_module=utils.Hashable(manager.module),
@@ -145,7 +134,7 @@ class ModuleManager(tp.Generic[M]):
         **kwargs,
     ) -> tp.Tuple[tp.Any, "ModuleManager[M]"]:
 
-        manager: ModuleManager[M] = self.copy()
+        manager: ModuleManager[M] = self
 
         if manager.variables is None:
             raise ValueError(
@@ -163,10 +152,8 @@ class ModuleManager(tp.Generic[M]):
 
         next_key, rngs = self._split_into(manager.key, self.rngs_apply)
 
-        variables = manager.variables.copy()
-
-        output, update = manager.module.apply(
-            variables,
+        output, variables = manager.module.apply(
+            manager.variables,
             *args,
             rngs=rngs,
             method=method,
@@ -174,11 +161,9 @@ class ModuleManager(tp.Generic[M]):
             **kwargs,
         )
 
-        variables.update(update.unfreeze())
-
-        manager = manager.replace(  # type: ignore
+        manager = manager.replace(
             key=next_key,
-            variables=variables,
+            variables=manager.variables.copy(variables),
         )
 
         return output, manager
@@ -189,17 +174,17 @@ class ModuleManager(tp.Generic[M]):
 
         return self.variables[key]
 
-    def __setitem__(self, key: str, value: tp.Any) -> None:
-        if self.variables is None:
-            raise KeyError(f"'variables' field is not set for module: {self.module}")
-
-        self.variables[key] = value
-
     def __contains__(self, key: str) -> bool:
         if self.variables is None:
             raise KeyError(f"'variables' field is not set for module: {self.module}")
 
         return key in self.variables
+
+    def update(self: "ModuleManager[M]", **kwargs) -> "ModuleManager[M]":
+        if self.variables is None:
+            raise ValueError(f"'variables' field is not set for module: {self.module}")
+
+        return self.replace(variables=self.variables.copy(kwargs))
 
     @staticmethod
     def _split_into(

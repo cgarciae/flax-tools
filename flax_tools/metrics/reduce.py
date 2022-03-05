@@ -60,7 +60,7 @@ class Reduce(Metric):
         else:
             count = None
 
-        return self.replace(total=total, count=count)  # type: ignore
+        return self.replace(total=total, count=count)
 
     def update(
         self: R,
@@ -124,7 +124,7 @@ class Reduce(Metric):
         else:
             count = None
 
-        return self.replace(total=total, count=count)  # type: ignore
+        return self.replace(total=total, count=count)
 
     def compute(self) -> tp.Any:
         if self.total is None:

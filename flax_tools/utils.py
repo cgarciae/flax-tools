@@ -18,6 +18,11 @@ ScalarLike = tp.Union[float, np.ndarray, jnp.ndarray]
 KeyLike = tp.Union[int, jnp.ndarray]
 
 
+class Immutable:
+    def replace(self: A, **kwargs) -> A:
+        raise NotImplementedError()
+
+
 class Hashable(tp.Generic[A]):
     """A hashable immutable wrapper around non-hashable values"""
 

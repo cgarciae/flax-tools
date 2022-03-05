@@ -257,7 +257,7 @@ class Accuracy(Metric):
 
         initial_value = jnp.zeros(self.zeros_shape, dtype=jnp.uint32)
 
-        return self.replace(  # type: ignore
+        return self.replace(
             tp=initial_value,
             fp=initial_value,
             tn=initial_value,
@@ -286,7 +286,7 @@ class Accuracy(Metric):
             multiclass=self.multiclass,
         )
 
-        return self.replace(  # type: ignore
+        return self.replace(
             tp=self.tp + tp,
             fp=self.fp + fp,
             tn=self.tn + tn,
