@@ -103,7 +103,7 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
             variables = FrozenDict(variables)
 
         module_manager = module_manager.replace(
-            key=key_manager,
+            key_manager=key_manager,
             variables=variables,
             hashable_module=utils.Hashable(module_manager.module),
         )
