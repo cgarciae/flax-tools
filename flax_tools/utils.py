@@ -4,6 +4,7 @@ import typing as tp
 from dataclasses import MISSING
 
 import flax.struct
+import jax
 import jax.numpy as jnp
 import numpy as np
 from flax.struct import dataclass
@@ -33,6 +34,9 @@ class Hashable(tp.Generic[A]):
 
     def __setattr__(self, name: str, value: tp.Any) -> None:
         raise AttributeError(f"Hashable is immutable")
+
+
+Key = jax.random.PRNGKey
 
 
 def field(

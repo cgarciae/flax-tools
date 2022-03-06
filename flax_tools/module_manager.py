@@ -1,12 +1,13 @@
 import typing as tp
 
 import flax
-from flax.core.frozen_dict import FrozenDict
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+from flax.core.frozen_dict import FrozenDict
 
 from flax_tools import utils
+from flax_tools.key_manager import KeyManager
 
 FrozerVariables = FrozenDict[str, tp.Mapping[str, tp.Any]]
 Variables = tp.Mapping[str, tp.Mapping[str, tp.Any]]
@@ -17,7 +18,7 @@ M = tp.TypeVar("M", bound="nn.module.Module")
 class ModuleManager(tp.Generic[M], utils.Immutable):
 
     variables: tp.Optional[FrozerVariables]
-    key: tp.Optional[jnp.ndarray]
+    key_manager: tp.Optional[KeyManager]
 
     hashable_module: utils.Hashable[M] = utils.static()
     training: bool = utils.static()
@@ -40,7 +41,7 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
         cls,
         module: M,
         variables: tp.Optional[Variables] = None,
-        key: tp.Optional[jnp.ndarray] = None,
+        key: tp.Optional[tp.Union[jnp.ndarray, int]] = None,
         training: bool = True,
         mutable_train: tp.Sequence[str] = ("batch_stats", "cache"),
         mutable_eval: tp.Optional[tp.Sequence[str]] = None,
@@ -51,7 +52,7 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
         return cls(
             hashable_module=utils.Hashable(module),
             variables=FrozenDict(variables) if variables is not None else None,
-            key=key,
+            key_manager=KeyManager.new(key) if key is not None else None,
             training=training,
             mutable_train=mutable_train,
             mutable_eval=mutable_eval or tuple(mutable_train),
@@ -74,16 +75,17 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
         return self.train(mode=False)
 
     def init(
-        self: "ModuleManager[M]", key: jnp.ndarray, *args, **kwargs
+        self: "ModuleManager[M]", key: tp.Union[jnp.ndarray, int], *args, **kwargs
     ) -> "ModuleManager[M]":
         """
         Initialize the module.
         """
 
-        manager: ModuleManager[M] = self
+        module_manager: ModuleManager[M] = self
+        key_manager = KeyManager.new(key)
 
         if "method" not in kwargs:
-            method = getattr(manager.module, self.method_init)
+            method = getattr(module_manager.module, self.method_init)
         else:
             method = kwargs.pop("method")
 
@@ -93,20 +95,20 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
             if arg_names is not None and "training" in arg_names:
                 kwargs["training"] = self.training if self.initialized else False
 
-        next_key, rngs = self._split_into(key, self.rngs_init)
+        rngs, key_manager = key_manager.split_into_collection(self.rngs_init)
 
-        variables = manager.module.init(rngs, *args, method=method, **kwargs)
+        variables = module_manager.module.init(rngs, *args, method=method, **kwargs)
 
         if not isinstance(variables, FrozenDict):
             variables = FrozenDict(variables)
 
-        manager = manager.replace(
-            key=next_key,
+        module_manager = module_manager.replace(
+            key=key_manager,
             variables=variables,
-            hashable_module=utils.Hashable(manager.module),
+            hashable_module=utils.Hashable(module_manager.module),
         )
 
-        return manager
+        return module_manager
 
     def __call__(
         self: "ModuleManager[M]",
@@ -134,15 +136,17 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
         **kwargs,
     ) -> tp.Tuple[tp.Any, "ModuleManager[M]"]:
 
-        manager: ModuleManager[M] = self
+        module_manager: ModuleManager[M] = self
 
-        if manager.variables is None:
+        if module_manager.variables is None:
             raise ValueError(
-                f"'variables' field is not set for module: {manager.module}"
+                f"'variables' field is not set for module: {module_manager.module}"
             )
 
-        if manager.key is None:
-            raise ValueError(f"'key' field is not set for module: {manager.module}")
+        if module_manager.key_manager is None:
+            raise ValueError(
+                f"'key' field is not set for module: {module_manager.module}"
+            )
 
         if "training" not in kwargs:
             arg_names = utils._function_argument_names(method)
@@ -150,23 +154,27 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
             if arg_names is not None and "training" in arg_names:
                 kwargs["training"] = self.training if self.initialized else False
 
-        next_key, rngs = self._split_into(manager.key, self.rngs_apply)
+        rngs, key_manager = module_manager.key_manager.split_into_collection(
+            self.rngs_apply
+        )
 
-        output, variables = manager.module.apply(
-            manager.variables,
+        output, variables = module_manager.module.apply(
+            module_manager.variables,
             *args,
             rngs=rngs,
             method=method,
-            mutable=self.mutable_train if manager.training else self.mutable_eval,
+            mutable=self.mutable_train
+            if module_manager.training
+            else self.mutable_eval,
             **kwargs,
         )
 
-        manager = manager.replace(
-            key=next_key,
-            variables=manager.variables.copy(variables),
+        module_manager = module_manager.replace(
+            key_manager=key_manager,
+            variables=module_manager.variables.copy(variables),
         )
 
-        return output, manager
+        return output, module_manager
 
     def __getitem__(self, key: str) -> tp.Any:
         if self.variables is None:
@@ -185,19 +193,3 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
             raise ValueError(f"'variables' field is not set for module: {self.module}")
 
         return self.replace(variables=self.variables.copy(kwargs))
-
-    @staticmethod
-    def _split_into(
-        key: jnp.ndarray,
-        rngs: tp.Sequence[str],
-    ) -> tp.Tuple[jnp.ndarray, tp.Dict[str, jnp.ndarray]]:
-        """
-        Split the key into the specified rngs.
-        """
-
-        next_key, key = jax.random.split(key)
-        keys = jax.random.split(key, len(rngs))
-
-        keys_collection = {rng: keys[i] for i, rng in enumerate(rngs)}
-
-        return next_key, keys_collection

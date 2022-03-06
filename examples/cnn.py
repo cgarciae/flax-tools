@@ -128,7 +128,7 @@ def main(
     seed: int = 42,
 ):
 
-    key = jax.random.PRNGKey(seed)
+    key = ft.Key(seed)
 
     # load data
     dataset = load_dataset("mnist")
