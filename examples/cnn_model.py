@@ -47,24 +47,6 @@ class CNN(nn.Module):
         return x
 
 
-def loss_fn(
-    params: tp.Any,
-    model: "Model",
-    x: jnp.ndarray,
-    y: jnp.ndarray,
-) -> tp.Tuple[jnp.ndarray, "Model"]:
-    preds: jnp.ndarray
-
-    module = model.module.update(params=params)
-    preds, module = module(x)
-
-    batch_updates = model.metrics.batch_updates(preds=preds, target=y)
-    loss = batch_updates.total_loss()
-    metrics = model.metrics.merge(batch_updates)
-
-    return loss, model.replace(module=module, metrics=metrics)
-
-
 @ft.dataclass
 class Model(ft.Immutable):
     module: Module
@@ -93,6 +75,25 @@ class Model(ft.Immutable):
 
         return model.replace(module=module, optimizer=optimizer, metrics=metrics)
 
+    def loss_fn(
+        self: "Model",
+        params: tp.Any,
+        x: jnp.ndarray,
+        y: jnp.ndarray,
+    ) -> tp.Tuple[jnp.ndarray, "Model"]:
+        model: Model = self
+        preds: jnp.ndarray
+        module = model.module.update(params=params)
+
+        preds, module = module(x)
+
+        batch_updates = model.metrics.batch_updates(preds=preds, target=y)
+        loss = batch_updates.total_loss()
+        metrics = model.metrics.merge(batch_updates)
+        model = model.replace(module=module, metrics=metrics)
+
+        return loss, model
+
     @jax.jit
     def train_step(
         self: "Model",
@@ -100,10 +101,10 @@ class Model(ft.Immutable):
         y: jnp.ndarray,
     ) -> tp.Tuple[Logs, "Model"]:
         print("JITTTTING")
-        model = self
+        model: Model = self
         params = model.module["params"]
 
-        grads, model = jax.grad(loss_fn, has_aux=True)(params, model, x, y)
+        grads, model = jax.grad(model.loss_fn, has_aux=True)(params, x, y)
 
         params, optimizer = model.optimizer.update(grads, params)
         module = model.module.update(params=params)
@@ -118,7 +119,7 @@ class Model(ft.Immutable):
         self: "Model", x: jnp.ndarray, y: jnp.ndarray
     ) -> tp.Tuple[Logs, "Model"]:
         model = self
-        loss, model = loss_fn(model.module["params"], model, x, y)
+        loss, model = model.loss_fn(model.module["params"], x, y)
 
         logs = model.metrics.compute()
 
