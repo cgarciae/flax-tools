@@ -109,7 +109,7 @@ class Crossentropy(Loss):
     Usage with the `Elegy` API:
 
     ```python
-    model = elegy.Model(
+    module = elegy.Model(
         module_fn,
         loss=tx.losses.Crossentropy(),
         metrics=elegy.metrics.Accuracy(),

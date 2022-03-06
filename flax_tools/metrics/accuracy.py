@@ -270,7 +270,7 @@ class Accuracy(Metric):
         utils.
 
         Args:
-            preds: Predictions from model (logits, probabilities, or target)
+            preds: Predictions from module (logits, probabilities, or target)
             target: Ground truth target
         """
 

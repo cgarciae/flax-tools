@@ -35,19 +35,19 @@ class TestModuleManager:
         key = jax.random.PRNGKey(0)
 
         module = Block()
-        model = ft.ModuleManager.new(module)
+        module = ft.ModuleManager.new(module)
 
-        model = model.init(key, x)
+        module = module.init(key, x)
 
-        assert model.variables is not None
+        assert module.variables is not None
 
-        assert "params" in model.variables
-        assert model.variables["params"]["Dense_0"]["kernel"].shape == (3, 4)
-        assert model.variables["params"]["Dense_0"]["bias"].shape == (4,)
-        assert model.variables["params"]["BatchNorm_0"]["bias"].shape == (4,)
-        assert model.variables["params"]["BatchNorm_0"]["scale"].shape == (4,)
-        assert model.variables["batch_stats"]["BatchNorm_0"]["mean"].shape == (4,)
-        assert model.variables["batch_stats"]["BatchNorm_0"]["var"].shape == (4,)
+        assert "params" in module.variables
+        assert module.variables["params"]["Dense_0"]["kernel"].shape == (3, 4)
+        assert module.variables["params"]["Dense_0"]["bias"].shape == (4,)
+        assert module.variables["params"]["BatchNorm_0"]["bias"].shape == (4,)
+        assert module.variables["params"]["BatchNorm_0"]["scale"].shape == (4,)
+        assert module.variables["batch_stats"]["BatchNorm_0"]["mean"].shape == (4,)
+        assert module.variables["batch_stats"]["BatchNorm_0"]["var"].shape == (4,)
 
     def test_init_jit(self):
 
@@ -57,23 +57,23 @@ class TestModuleManager:
         Model = ft.ModuleManager[Block]
 
         module = Block()
-        model: Model = ft.ModuleManager.new(module)
+        module: Model = ft.ModuleManager.new(module)
 
         @jax.jit
-        def f(model: Model, key, x) -> Model:
-            return model.init(key, x)
+        def f(module: Model, key, x) -> Model:
+            return module.init(key, x)
 
-        model = f(model, key, x)
+        module = f(module, key, x)
 
-        assert model.variables is not None
+        assert module.variables is not None
 
-        assert "params" in model.variables
-        assert model.variables["params"]["Dense_0"]["kernel"].shape == (3, 4)
-        assert model.variables["params"]["Dense_0"]["bias"].shape == (4,)
-        assert model.variables["params"]["BatchNorm_0"]["bias"].shape == (4,)
-        assert model.variables["params"]["BatchNorm_0"]["scale"].shape == (4,)
-        assert model.variables["batch_stats"]["BatchNorm_0"]["mean"].shape == (4,)
-        assert model.variables["batch_stats"]["BatchNorm_0"]["var"].shape == (4,)
+        assert "params" in module.variables
+        assert module.variables["params"]["Dense_0"]["kernel"].shape == (3, 4)
+        assert module.variables["params"]["Dense_0"]["bias"].shape == (4,)
+        assert module.variables["params"]["BatchNorm_0"]["bias"].shape == (4,)
+        assert module.variables["params"]["BatchNorm_0"]["scale"].shape == (4,)
+        assert module.variables["batch_stats"]["BatchNorm_0"]["mean"].shape == (4,)
+        assert module.variables["batch_stats"]["BatchNorm_0"]["var"].shape == (4,)
 
     def test_apply(self):
 
@@ -81,11 +81,11 @@ class TestModuleManager:
         key = jax.random.PRNGKey(0)
 
         module = Block()
-        model = ft.ModuleManager.new(module)
+        module = ft.ModuleManager.new(module)
 
-        model = model.init(key, x)
+        module = module.init(key, x)
 
-        y, model = model(x)
+        y, module = module(x)
 
         assert y.shape == (2, 4)
 
@@ -97,19 +97,19 @@ class TestModuleManager:
         Model = ft.ModuleManager[Block]
 
         module = Block()
-        model: Model = ft.ModuleManager.new(module)
+        module: Model = ft.ModuleManager.new(module)
 
         @jax.jit
-        def f(model: Model, key, x) -> Model:
-            return model.init(key, x)
+        def f(module: Model, key, x) -> Model:
+            return module.init(key, x)
 
-        model = f(model, key, x)
+        module = f(module, key, x)
 
         @jax.jit
-        def g(model: Model, x) -> tp.Tuple[jnp.ndarray, Model]:
-            return model(x)
+        def g(module: Model, x) -> tp.Tuple[jnp.ndarray, Model]:
+            return module(x)
 
-        y, model = g(model, x)
+        y, module = g(module, x)
 
         assert y.shape == (2, 4)
 
@@ -119,11 +119,11 @@ class TestModuleManager:
         key = jax.random.PRNGKey(0)
 
         module = BlockMethod()
-        model = ft.ModuleManager.new(module, method_init="forward")
+        module = ft.ModuleManager.new(module, method_init="forward")
 
-        model = model.init(key, x)
+        module = module.init(key, x)
 
-        y, model = model.forward(x)
+        y, module = module.forward(x)
 
         assert y.shape == (2, 4)
 
@@ -135,19 +135,19 @@ class TestModuleManager:
         Model = ft.ModuleManager[BlockMethod]
 
         module = BlockMethod()
-        model: Model = ft.ModuleManager.new(module, method_init="forward")
+        module: Model = ft.ModuleManager.new(module, method_init="forward")
 
         @jax.jit
-        def f(model: Model, key, x) -> Model:
-            return model.init(key, x)
+        def f(module: Model, key, x) -> Model:
+            return module.init(key, x)
 
-        model = f(model, key, x)
+        module = f(module, key, x)
 
         @jax.jit
-        def g(model: Model, x) -> tp.Tuple[jnp.ndarray, Model]:
-            return model.forward(x)
+        def g(module: Model, x) -> tp.Tuple[jnp.ndarray, Model]:
+            return module.forward(x)
 
-        y, model = g(model, x)
+        y, module = g(module, x)
 
         assert y.shape == (2, 4)
 
@@ -157,22 +157,22 @@ class TestModuleManager:
         key = jax.random.PRNGKey(0)
 
         module = Block()
-        model = ft.ModuleManager.new(module)
+        module = ft.ModuleManager.new(module)
 
-        model = model.init(key, x)
+        module = module.init(key, x)
 
-        y, model = model(x)
+        y, module = module(x)
 
         assert y.shape == (2, 4)
 
-        y2, model = model(x)
+        y2, module = module(x)
 
         assert not np.allclose(y, y2)
 
-        model = model.eval()
+        module = module.eval()
 
-        y3, model = model(x)
-        y4, model = model(x)
+        y3, module = module(x)
+        y4, module = module(x)
 
         assert np.allclose(y3, y4)
 
@@ -184,36 +184,36 @@ class TestModuleManager:
         Model = ft.ModuleManager[Block]
 
         module = Block()
-        model: Model = ft.ModuleManager.new(module)
+        module: Model = ft.ModuleManager.new(module)
 
         @jax.jit
-        def f(model: Model, key, x) -> Model:
-            return model.init(key, x)
+        def f(module: Model, key, x) -> Model:
+            return module.init(key, x)
 
-        model = f(model, key, x)
+        module = f(module, key, x)
 
         @jax.jit
-        def g(model: Model, x) -> tp.Tuple[jnp.ndarray, Model]:
+        def g(module: Model, x) -> tp.Tuple[jnp.ndarray, Model]:
             print("JITTTING")
-            return model(x)
+            return module(x)
 
         print()
         print()
         print("TRAIN")
-        y, model = g(model, x)
-        y, model = g(model, x)
+        y, module = g(module, x)
+        y, module = g(module, x)
 
         print("EVAL")
-        model = model.eval()
+        module = module.eval()
 
-        y, model = g(model, x)
-        y, model = g(model, x)
+        y, module = g(module, x)
+        y, module = g(module, x)
 
-        model = model.train()
+        module = module.train()
 
         print("TRAIN")
-        y, model = g(model, x)
-        y, model = g(model, x)
+        y, module = g(module, x)
+        y, module = g(module, x)
         print()
         print()
 

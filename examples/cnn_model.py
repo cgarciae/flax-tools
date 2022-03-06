@@ -20,7 +20,7 @@ C = tp.TypeVar("C", bound=clu.metrics.Collection)
 
 Metrics = ft.LossesAndMetrics
 Batch = tp.Mapping[str, np.ndarray]
-Model = ft.ModuleManager["CNN"]
+Module = ft.ModuleManager["CNN"]
 Logs = tp.Dict[str, jnp.ndarray]
 np.random.seed(420)
 
@@ -47,77 +47,87 @@ class CNN(nn.Module):
         return x
 
 
-@jax.jit
-def init_step(
-    module: Model,
-    optimizer: ft.Optimizer,
-    metrics: Metrics,
-    key: jnp.ndarray,
-    inputs: tp.Any,
-) -> tp.Tuple[Model, ft.Optimizer, Metrics]:
-    module = module.init(key, inputs)
-    optimizer = optimizer.init(module["params"])
-    metrics = metrics.reset()
-
-    return module, optimizer, metrics
-
-
 def loss_fn(
     params: tp.Any,
-    module: Model,
-    metrics: Metrics,
+    model: "Model",
     x: jnp.ndarray,
     y: jnp.ndarray,
-) -> tp.Tuple[jnp.ndarray, tp.Tuple[Model, Metrics]]:
+) -> tp.Tuple[jnp.ndarray, "Model"]:
     preds: jnp.ndarray
 
-    module = module.update(params=params)
+    module = model.module.update(params=params)
     preds, module = module(x)
 
-    batch_updates = metrics.batch_updates(preds=preds, target=y)
+    batch_updates = model.metrics.batch_updates(preds=preds, target=y)
     loss = batch_updates.total_loss()
-    metrics = metrics.merge(batch_updates)
+    metrics = model.metrics.merge(batch_updates)
 
-    return loss, (module, metrics)
-
-
-@jax.jit
-def train_step(
-    module: Model,
-    optimizer: ft.Optimizer,
-    metrics: Metrics,
-    x: jnp.ndarray,
-    y: jnp.ndarray,
-) -> tp.Tuple[Logs, Model, ft.Optimizer, Metrics]:
-    print("JITTTTING")
-    params = module["params"]
-
-    grads, (module, metrics) = jax.grad(loss_fn, has_aux=True)(
-        params, module, metrics, x, y
-    )
-
-    params, optimizer = optimizer.update(grads, params)
-    module = module.update(params=params)
-    logs = metrics.compute()
-
-    return logs, module, optimizer, metrics
+    return loss, model.replace(module=module, metrics=metrics)
 
 
-@jax.jit
-def test_step(
-    module: Model, metrics: Metrics, x: jnp.ndarray, y: jnp.ndarray
-) -> tp.Tuple[Logs, Metrics]:
+@ft.dataclass
+class Model(ft.Immutable):
+    module: Module
+    optimizer: ft.Optimizer
+    metrics: Metrics
 
-    loss, (module, metrics) = loss_fn(module["params"], module, metrics, x, y)
+    def reset_metrics(self) -> "Model":
+        return self.replace(metrics=self.metrics.reset())
 
-    logs = metrics.compute()
+    def train(self) -> "Model":
+        return self.replace(module=self.module.train())
 
-    return logs, metrics
+    def eval(self) -> "Model":
+        return self.replace(module=self.module.eval())
 
+    @jax.jit
+    def init_step(
+        self: "Model",
+        key: jnp.ndarray,
+        inputs: tp.Any,
+    ) -> "Model":
+        model = self
+        module = model.module.init(key, inputs)
+        optimizer = model.optimizer.init(module["params"])
+        metrics = model.metrics.reset()
 
-@jax.jit
-def predict(module: Model, x: jnp.ndarray):
-    return module(x)[0].argmax(axis=1)
+        return model.replace(module=module, optimizer=optimizer, metrics=metrics)
+
+    @jax.jit
+    def train_step(
+        self: "Model",
+        x: jnp.ndarray,
+        y: jnp.ndarray,
+    ) -> tp.Tuple[Logs, "Model"]:
+        print("JITTTTING")
+        model = self
+        params = model.module["params"]
+
+        grads, model = jax.grad(loss_fn, has_aux=True)(params, model, x, y)
+
+        params, optimizer = model.optimizer.update(grads, params)
+        module = model.module.update(params=params)
+        logs = model.metrics.compute()
+
+        model = model.replace(module=module, optimizer=optimizer)
+
+        return logs, model
+
+    @jax.jit
+    def test_step(
+        self: "Model", x: jnp.ndarray, y: jnp.ndarray
+    ) -> tp.Tuple[Logs, "Model"]:
+        model = self
+        loss, model = loss_fn(model.module["params"], model, x, y)
+
+        logs = model.metrics.compute()
+
+        return logs, model
+
+    @jax.jit
+    def predict(self: "Model", x: jnp.ndarray):
+        model = self
+        return model.module(x)[0].argmax(axis=1)
 
 
 # define parameters
@@ -139,17 +149,17 @@ def main(
     y_test = dataset["test"]["label"]
 
     # define module
-    module: Model = ft.ModuleManager.new(CNN())
 
-    optimizer = ft.Optimizer(optax.adamw(1e-3))
-    metrics = ft.LossesAndMetrics.new(
-        metrics=ft.metrics.Accuracy.new(),
-        losses=ft.losses.Crossentropy.new(),
+    model: Model = Model(
+        module=ft.ModuleManager.new(CNN()),
+        optimizer=ft.Optimizer(optax.adamw(1e-3)),
+        metrics=ft.LossesAndMetrics.new(
+            metrics=ft.metrics.Accuracy.new(),
+            losses=ft.losses.Crossentropy.new(),
+        ),
     )
 
-    module, optimizer, metrics = init_step(
-        module, optimizer, metrics, key, X_train[:batch_size]
-    )
+    model = model.init_step(key, X_train[:batch_size])
 
     # print(module.tabulate(X_train[:batch_size], signature=True))
 
@@ -165,8 +175,7 @@ def main(
         # ---------------------------------------
         # train
         # ---------------------------------------
-        module = module.train()
-        metrics = metrics.reset()
+        model = model.train().reset_metrics()
         for step in tqdm(
             range(
                 len(X_train) // batch_size if steps_per_epoch < 1 else steps_per_epoch
@@ -178,17 +187,15 @@ def main(
             idx = np.random.choice(len(X_train), batch_size)
             x = X_train[idx]
             y = y_train[idx]
-            train_logs, module, optimizer, metrics = train_step(
-                module, optimizer, metrics, x, y
-            )
+            train_logs, model = model.train_step(x, y)
 
         history_train.append(train_logs)
 
         # ---------------------------------------
         # test
         # ---------------------------------------
-        module = module.eval()
-        metrics = metrics.reset()
+        model = model.eval().reset_metrics()
+
         for step in tqdm(
             range(
                 len(X_test) // batch_size if steps_per_epoch < 1 else steps_per_epoch
@@ -200,7 +207,7 @@ def main(
             idx = np.random.choice(len(X_test), batch_size)
             x = X_test[idx]
             y = y_test[idx]
-            test_logs, metrics = test_step(module, metrics, x, y)
+            test_logs, model = model.test_step(x, y)
 
         history_test.append(test_logs)
         test_logs = {f"{name}_valid": value for name, value in test_logs.items()}
@@ -210,7 +217,7 @@ def main(
 
         print(f"[{epoch}] {logs}")
 
-    module = module.eval()
+    model = model.eval()
 
     for name in history_train[0]:
         plt.figure()
@@ -222,7 +229,7 @@ def main(
     idxs = np.random.choice(len(X_test), 10)
     x_sample = X_test[idxs]
 
-    preds = predict(module, x_sample)
+    preds = model.predict(x_sample)
 
     plt.figure()
     for i in range(5):

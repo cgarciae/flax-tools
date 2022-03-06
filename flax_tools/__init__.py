@@ -4,7 +4,7 @@ from .metrics import Metric, Metrics, Losses, AuxLosses, LossesAndMetrics
 from .losses import Loss
 from .module_manager import ModuleManager
 from .optimizer import Optimizer
-from .utils import Hashable, field, node, static, dataclass
+from .utils import Hashable, field, node, static, dataclass, Immutable
 
 __all__ = [
     "Hashable",
@@ -20,4 +20,5 @@ __all__ = [
     "node",
     "static",
     "dataclass",
+    "Immutable",
 ]
