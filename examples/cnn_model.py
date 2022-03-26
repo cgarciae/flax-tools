@@ -52,6 +52,7 @@ class Model(ft.Immutable):
     module: Module
     optimizer: ft.Optimizer
     metrics: Metrics
+    key: jnp.ndarray
 
     def reset_metrics(self) -> "Model":
         return self.replace(metrics=self.metrics.reset())
@@ -65,27 +66,33 @@ class Model(ft.Immutable):
     @jax.jit
     def init_step(
         self: "Model",
-        key: jnp.ndarray,
         inputs: tp.Any,
     ) -> "Model":
         model = self
-        module = model.module.init(key, inputs)
+        key, step_key = jax.random.split(model.key)
+        module = model.module.init(step_key, inputs)
         optimizer = model.optimizer.init(module["params"])
         metrics = model.metrics.reset()
 
-        return model.replace(module=module, optimizer=optimizer, metrics=metrics)
+        return model.replace(
+            module=module, optimizer=optimizer, metrics=metrics, key=key
+        )
 
     def loss_fn(
         self: "Model",
-        params: tp.Any,
+        params: tp.Optional[tp.Dict[str, tp.Any]],
+        key: tp.Optional[jnp.ndarray],
         x: jnp.ndarray,
         y: jnp.ndarray,
     ) -> tp.Tuple[jnp.ndarray, "Model"]:
         model: Model = self
         preds: jnp.ndarray
-        module = model.module.update(params=params)
+        module = model.module
 
-        preds, module = module(x)
+        if params is not None:
+            module = module.update(params=params)
+
+        preds, module = module(key, x)
 
         batch_updates = model.metrics.batch_updates(preds=preds, target=y)
         loss = batch_updates.total_loss()
@@ -104,13 +111,14 @@ class Model(ft.Immutable):
         model: Model = self
         params = model.module["params"]
 
-        grads, model = jax.grad(model.loss_fn, has_aux=True)(params, x, y)
+        key, step_key = jax.random.split(model.key)
+        grads, model = jax.grad(model.loss_fn, has_aux=True)(params, step_key, x, y)
 
         params, optimizer = model.optimizer.update(grads, params)
         module = model.module.update(params=params)
         logs = model.metrics.compute()
 
-        model = model.replace(module=module, optimizer=optimizer)
+        model = model.replace(module=module, optimizer=optimizer, key=key)
 
         return logs, model
 
@@ -119,7 +127,7 @@ class Model(ft.Immutable):
         self: "Model", x: jnp.ndarray, y: jnp.ndarray
     ) -> tp.Tuple[Logs, "Model"]:
         model = self
-        loss, model = model.loss_fn(model.module["params"], x, y)
+        loss, model = model.loss_fn(params=None, key=None, x=x, y=y)
 
         logs = model.metrics.compute()
 
@@ -127,8 +135,7 @@ class Model(ft.Immutable):
 
     @jax.jit
     def predict(self: "Model", x: jnp.ndarray):
-        model = self
-        return model.module(x)[0].argmax(axis=1)
+        return self.module(None, x)[0].argmax(axis=1)
 
 
 # define parameters
@@ -138,8 +145,6 @@ def main(
     steps_per_epoch: int = -1,
     seed: int = 42,
 ):
-
-    key = jax.random.PRNGKey(seed)
 
     # load data
     dataset = load_dataset("mnist")
@@ -158,9 +163,10 @@ def main(
             metrics=ft.metrics.Accuracy.new(),
             losses=ft.losses.Crossentropy.new(),
         ),
+        key=jax.random.PRNGKey(seed),
     )
 
-    model = model.init_step(key, X_train[:batch_size])
+    model = model.init_step(X_train[:batch_size])
 
     # print(module.tabulate(X_train[:batch_size], signature=True))
 

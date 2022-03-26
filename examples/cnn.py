@@ -63,19 +63,26 @@ def init_step(
 
 
 def loss_fn(
-    params: tp.Any,
+    params: tp.Optional[tp.Dict[str, tp.Any]],
     module: Model,
     metrics: Metrics,
+    key: tp.Optional[jnp.ndarray],
     x: jnp.ndarray,
     y: jnp.ndarray,
 ) -> tp.Tuple[jnp.ndarray, tp.Tuple[Model, Metrics]]:
     preds: jnp.ndarray
 
-    module = module.update(params=params)
-    preds, module = module(x)
+    if params is not None:
+        module = module.update(params=params)
+
+    preds, module = module(key, x)
 
     batch_updates = metrics.batch_updates(preds=preds, target=y)
     loss = batch_updates.total_loss()
+
+    # batch_updates = jax.lax.all_gather(batch_updates, "device").aggreate()
+    # batch_updates = jax.lax.psum(batch_updates, "device")
+
     metrics = metrics.merge(batch_updates)
 
     return loss, (module, metrics)
@@ -86,6 +93,7 @@ def train_step(
     module: Model,
     optimizer: ft.Optimizer,
     metrics: Metrics,
+    key: jnp.ndarray,
     x: jnp.ndarray,
     y: jnp.ndarray,
 ) -> tp.Tuple[Logs, Model, ft.Optimizer, Metrics]:
@@ -93,7 +101,7 @@ def train_step(
     params = module["params"]
 
     grads, (module, metrics) = jax.grad(loss_fn, has_aux=True)(
-        params, module, metrics, x, y
+        params, module, metrics, key, x, y
     )
 
     params, optimizer = optimizer.update(grads, params)
@@ -105,10 +113,15 @@ def train_step(
 
 @jax.jit
 def test_step(
-    module: Model, metrics: Metrics, x: jnp.ndarray, y: jnp.ndarray
+    module: Model,
+    metrics: Metrics,
+    x: jnp.ndarray,
+    y: jnp.ndarray,
 ) -> tp.Tuple[Logs, Metrics]:
 
-    loss, (module, metrics) = loss_fn(module["params"], module, metrics, x, y)
+    loss, (module, metrics) = loss_fn(
+        params=None, module=module, metrics=metrics, key=None, x=x, y=y
+    )
 
     logs = metrics.compute()
 
@@ -117,7 +130,7 @@ def test_step(
 
 @jax.jit
 def predict(module: Model, x: jnp.ndarray):
-    return module(x)[0].argmax(axis=1)
+    return module.stateless(None, x).argmax(axis=1)
 
 
 # define parameters
@@ -178,8 +191,9 @@ def main(
             idx = np.random.choice(len(X_train), batch_size)
             x = X_train[idx]
             y = y_train[idx]
+            key, step_key = jax.random.split(key)
             train_logs, module, optimizer, metrics = train_step(
-                module, optimizer, metrics, x, y
+                module, optimizer, metrics, step_key, x, y
             )
 
         history_train.append(train_logs)

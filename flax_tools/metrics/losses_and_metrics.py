@@ -15,14 +15,15 @@ class LossesAndMetrics(Metric):
     @classmethod
     def new(
         cls,
-        losses: tp.Any,
-        metrics: tp.Any,
+        losses: tp.Any = (),
+        metrics: tp.Any = (),
         name: tp.Optional[str] = None,
         on: tp.Optional[utils.IndexLike] = None,
         kwargs: tp.Optional[tp.Dict[str, tp.Any]] = None,
     ):
         if kwargs is None:
             kwargs = {}
+
         if not isinstance(losses, Losses):
             losses = Losses.new(losses)
 

@@ -7,7 +7,6 @@ import jax.numpy as jnp
 from flax.core.frozen_dict import FrozenDict
 
 from flax_tools import utils
-from flax_tools.key_manager import KeyManager
 
 FrozerVariables = FrozenDict[str, tp.Mapping[str, tp.Any]]
 Variables = tp.Mapping[str, tp.Mapping[str, tp.Any]]
@@ -18,7 +17,6 @@ M = tp.TypeVar("M", bound="nn.module.Module")
 class ModuleManager(tp.Generic[M], utils.Immutable):
 
     variables: tp.Optional[FrozerVariables]
-    key_manager: tp.Optional[KeyManager]
 
     hashable_module: utils.Hashable[M] = utils.static()
     training: bool = utils.static()
@@ -41,7 +39,6 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
         cls,
         module: M,
         variables: tp.Optional[Variables] = None,
-        key: tp.Optional[tp.Union[jnp.ndarray, int]] = None,
         training: bool = True,
         mutable_train: tp.Sequence[str] = ("batch_stats", "cache"),
         mutable_eval: tp.Optional[tp.Sequence[str]] = None,
@@ -52,7 +49,6 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
         return cls(
             hashable_module=utils.Hashable(module),
             variables=FrozenDict(variables) if variables is not None else None,
-            key_manager=KeyManager.new(key) if key is not None else None,
             training=training,
             mutable_train=mutable_train,
             mutable_eval=mutable_eval or tuple(mutable_train),
@@ -75,14 +71,13 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
         return self.train(mode=False)
 
     def init(
-        self: "ModuleManager[M]", key: tp.Union[jnp.ndarray, int], *args, **kwargs
+        self: "ModuleManager[M]", key: tp.Optional[utils.KeyLike], *args, **kwargs
     ) -> "ModuleManager[M]":
         """
         Initialize the module.
         """
 
         module_manager: ModuleManager[M] = self
-        key_manager = KeyManager.new(key)
 
         if "method" not in kwargs:
             method = getattr(module_manager.module, self.method_init)
@@ -95,7 +90,11 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
             if arg_names is not None and "training" in arg_names:
                 kwargs["training"] = self.training if self.initialized else False
 
-        rngs, key_manager = key_manager.split_into_collection(self.rngs_init)
+        if key is not None:
+            key = utils.Key(key)
+            rngs = _split_into_collection(key, self.rngs_init)
+        else:
+            rngs = {}
 
         variables = module_manager.module.init(rngs, *args, method=method, **kwargs)
 
@@ -103,7 +102,6 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
             variables = FrozenDict(variables)
 
         module_manager = module_manager.replace(
-            key_manager=key_manager,
             variables=variables,
             hashable_module=utils.Hashable(module_manager.module),
         )
@@ -111,11 +109,14 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
         return module_manager
 
     def __call__(
-        self: "ModuleManager[M]",
-        *args,
-        **kwargs,
+        self: "ModuleManager[M]", key: tp.Optional[utils.KeyLike], *args, **kwargs
     ) -> tp.Tuple[tp.Any, "ModuleManager[M]"]:
-        return self._forward(self.module.__call__, *args, **kwargs)
+        return self._forward(self.module.__call__, key, *args, **kwargs)
+
+    def stateless(
+        self: "ModuleManager[M]", key: tp.Optional[utils.KeyLike], *args, **kwargs
+    ) -> tp.Any:
+        return self(key, *args, **kwargs)[0]
 
     def __getattr__(self, name: str) -> tp.Any:
 
@@ -124,14 +125,15 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
         if not callable(method):
             raise AttributeError(f"module has no attribute '{name}'")
 
-        def wrapper(*args, **kwargs):
-            return self._forward(method, *args, **kwargs)
+        def wrapper(key: tp.Optional[utils.KeyLike], *args, **kwargs):
+            return self._forward(method, key, *args, **kwargs)
 
         return wrapper
 
     def _forward(
         self: "ModuleManager[M]",
         method: tp.Callable,
+        key: tp.Optional[utils.KeyLike],
         *args,
         **kwargs,
     ) -> tp.Tuple[tp.Any, "ModuleManager[M]"]:
@@ -143,20 +145,17 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
                 f"'variables' field is not set for module: {module_manager.module}"
             )
 
-        if module_manager.key_manager is None:
-            raise ValueError(
-                f"'key' field is not set for module: {module_manager.module}"
-            )
-
         if "training" not in kwargs:
             arg_names = utils._function_argument_names(method)
 
             if arg_names is not None and "training" in arg_names:
                 kwargs["training"] = self.training if self.initialized else False
 
-        rngs, key_manager = module_manager.key_manager.split_into_collection(
-            self.rngs_apply
-        )
+        if key is not None:
+            key = utils.Key(key)
+            rngs = _split_into_collection(key, self.rngs_apply)
+        else:
+            rngs = {}
 
         output, variables = module_manager.module.apply(
             module_manager.variables,
@@ -170,7 +169,6 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
         )
 
         module_manager = module_manager.replace(
-            key_manager=key_manager,
             variables=module_manager.variables.copy(variables),
         )
 
@@ -193,3 +191,18 @@ class ModuleManager(tp.Generic[M], utils.Immutable):
             raise ValueError(f"'variables' field is not set for module: {self.module}")
 
         return self.replace(variables=self.variables.copy(kwargs))
+
+
+def _split_into_collection(
+    key: jnp.ndarray,
+    collection: tp.Sequence[str],
+) -> tp.Dict[str, jnp.ndarray]:
+    """
+    Split the key into the specified rngs.
+    """
+
+    rngs = jax.random.split(key, len(collection))
+
+    keys_collection = {col: rngs[i] for i, col in enumerate(collection)}
+
+    return keys_collection

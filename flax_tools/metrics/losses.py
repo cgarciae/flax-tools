@@ -12,7 +12,7 @@ from flax_tools.metrics.metric import Metric
 
 @utils.dataclass
 class Losses(Metric):
-    losses: tp.Dict[str, Loss] = utils.node()
+    losses: tp.Dict[str, Loss] = utils.static()
     totals: tp.Optional[tp.Dict[str, jnp.ndarray]] = utils.node()
     counts: tp.Optional[tp.Dict[str, jnp.ndarray]] = utils.node()
 

@@ -85,7 +85,7 @@ class TestModuleManager:
 
         module = module.init(key, x)
 
-        y, module = module(x)
+        y, module = module(key, x)
 
         assert y.shape == (2, 4)
 
@@ -96,8 +96,7 @@ class TestModuleManager:
 
         Model = ft.ModuleManager[Block]
 
-        module = Block()
-        module: Model = ft.ModuleManager.new(module)
+        module: Model = ft.ModuleManager.new(Block())
 
         @jax.jit
         def f(module: Model, key, x) -> Model:
@@ -106,10 +105,10 @@ class TestModuleManager:
         module = f(module, key, x)
 
         @jax.jit
-        def g(module: Model, x) -> tp.Tuple[jnp.ndarray, Model]:
-            return module(x)
+        def g(module: Model, key, x) -> tp.Tuple[jnp.ndarray, Model]:
+            return module(key, x)
 
-        y, module = g(module, x)
+        y, module = g(module, key, x)
 
         assert y.shape == (2, 4)
 
@@ -123,7 +122,7 @@ class TestModuleManager:
 
         module = module.init(key, x)
 
-        y, module = module.forward(x)
+        y, module = module.forward(key, x)
 
         assert y.shape == (2, 4)
 
@@ -144,10 +143,10 @@ class TestModuleManager:
         module = f(module, key, x)
 
         @jax.jit
-        def g(module: Model, x) -> tp.Tuple[jnp.ndarray, Model]:
-            return module.forward(x)
+        def g(module: Model, key, x) -> tp.Tuple[jnp.ndarray, Model]:
+            return module.forward(key, x)
 
-        y, module = g(module, x)
+        y, module = g(module, key, x)
 
         assert y.shape == (2, 4)
 
@@ -161,18 +160,19 @@ class TestModuleManager:
 
         module = module.init(key, x)
 
-        y, module = module(x)
+        y, module = module(key, x)
 
         assert y.shape == (2, 4)
 
-        y2, module = module(x)
+        key, module_key = jax.random.split(key)
+        y2, module = module(module_key, x)
 
         assert not np.allclose(y, y2)
 
         module = module.eval()
 
-        y3, module = module(x)
-        y4, module = module(x)
+        y3, module = module(key, x)
+        y4, module = module(key, x)
 
         assert np.allclose(y3, y4)
 
@@ -193,27 +193,27 @@ class TestModuleManager:
         module = f(module, key, x)
 
         @jax.jit
-        def g(module: Model, x) -> tp.Tuple[jnp.ndarray, Model]:
+        def g(module: Model, key, x) -> tp.Tuple[jnp.ndarray, Model]:
             print("JITTTING")
-            return module(x)
+            return module(key, x)
 
         print()
         print()
         print("TRAIN")
-        y, module = g(module, x)
-        y, module = g(module, x)
+        y, module = g(module, key, x)
+        y, module = g(module, key, x)
 
         print("EVAL")
         module = module.eval()
 
-        y, module = g(module, x)
-        y, module = g(module, x)
+        y, module = g(module, key, x)
+        y, module = g(module, key, x)
 
         module = module.train()
 
         print("TRAIN")
-        y, module = g(module, x)
-        y, module = g(module, x)
+        y, module = g(module, key, x)
+        y, module = g(module, key, x)
         print()
         print()
 

@@ -5,7 +5,6 @@ from .losses import Loss
 from .module_manager import ModuleManager
 from .optimizer import Optimizer
 from .utils import Hashable, field, node, static, dataclass, Immutable, Key
-from .key_manager import KeyManager
 
 __all__ = [
     "Hashable",
@@ -22,4 +21,5 @@ __all__ = [
     "static",
     "dataclass",
     "Immutable",
+    "Key",
 ]

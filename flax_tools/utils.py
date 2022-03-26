@@ -36,7 +36,13 @@ class Hashable(tp.Generic[A]):
         raise AttributeError(f"Hashable is immutable")
 
 
-Key = jax.random.PRNGKey
+def Key(seed: tp.Union[jnp.ndarray, int]) -> jnp.ndarray:
+    key: jnp.ndarray
+    if isinstance(seed, int):
+        key = jax.random.PRNGKey(seed)
+    else:
+        key = seed
+    return key
 
 
 def field(
