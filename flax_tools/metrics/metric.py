@@ -1,7 +1,9 @@
+from functools import partial
 import typing as tp
 from abc import ABC, abstractmethod
 
 import jax
+import jax.numpy as jnp
 from flax_tools import utils
 
 M = tp.TypeVar("M", bound="Metric")
@@ -42,11 +44,15 @@ class Metric(ABC, utils.Immutable):
     def compute(self) -> tp.Any:
         ...
 
-    def batch_updates(self: M, **kwargs) -> M:
-        return self.reset().update(**kwargs)
+    def aggregate(self: M) -> M:
+        return jax.tree_map(partial(jnp.sum, axis=0), self)
 
     def merge(self: M, other: M) -> M:
-        return jax.tree_map(lambda x, y: x + y, self, other)
+        stacked: M = jax.tree_map(lambda *xs: jnp.stack(xs), self, other)
+        return stacked.aggregate()
+
+    def batch_updates(self: M, **kwargs) -> M:
+        return self.reset().update(**kwargs)
 
     def filter_args(self, *args: tp.Any) -> tp.Tuple[tp.Any, ...]:
         if self.on is None:
